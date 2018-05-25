@@ -3,10 +3,14 @@ import torch
 
 
 def parse_corpus(path, seq_length=50):
-    '''Parse raw corpus text into input-output pairs, where input is a sequence of characters, output is 1 character after the sequence'''
+    '''
+        Parse raw corpus text into input-output pairs
+          input: sequence of characters, 
+          output: 1 character after input sequence
+    '''
 
     # Read text
-    with open(path, 'r') as f:
+    with open(path, encoding='UTF-8', mode='r') as f:
         raw_text = f.read().replace('\n', '')
 
     # Get unique characters
@@ -27,6 +31,7 @@ def parse_corpus(path, seq_length=50):
         dataY.append(char_to_int[seq_out])
     
     return (dataX, dataY, char_to_int, int_to_char, chars)
+
 
 def format_data(dataX, dataY, n_classes, batch_size=64):
     '''Parse into minibatches, return Tensors'''

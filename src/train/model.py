@@ -12,9 +12,9 @@ class Net(nn.Module):
         self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
 
-        self.embeddings = nn.Embedding(n_vocab, embedding_dim)
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim, dropout=dropout)
-        self.hidden2out = nn.Linear(hidden_dim, n_vocab)
+        self.embeddings = nn.Embedding(n_vocab, embedding_dim)  # input size, hidden1 size
+        self.lstm = nn.LSTM(embedding_dim, hidden_dim, dropout=dropout)  # hidden1 size, hidden2 size
+        self.hidden2out = nn.Linear(hidden_dim, n_vocab)  # hidden2 size, output size
 
     def forward(self, seq_in):
         embeddings = self.embeddings(seq_in.t()) # LSTM takes 3D inputs (timesteps, batch, features)
