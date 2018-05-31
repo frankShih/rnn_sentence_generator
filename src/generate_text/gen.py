@@ -20,7 +20,7 @@ def to_prob(vec):
     s = sum(vec)
     return [v / s for v in vec]
 
-def gen_text(model, patterns, char_to_int, int_to_char, chars, n_sent=10, restart_seq=False):
+def gen_text(model, patterns, target_to_int, int_to_target, targets, n_sent=10, restart_seq=False):
     n_patterns = len(patterns)
 
     # Randomly choose a pattern to start text generation
@@ -36,18 +36,18 @@ def gen_text(model, patterns, char_to_int, int_to_char, chars, n_sent=10, restar
 
         seq_in = Variable(torch.LongTensor(seq_in))
 
-        # Predict next character
+        # Predict next target
         pred = model(seq_in)
         pred = to_prob(F.softmax(pred, dim=1).data[0].numpy()) # turn into probability distribution
-        char = np.random.choice(chars, p=pred)                 # pick char based on probability instead of always picking the highest value
-        char_idx = char_to_int[char]
-        print(char, end='')
+        target = np.random.choice(targets, p=pred)                 # pick char based on probability instead of always picking the highest value
+        target_idx = target_to_int[target]
+        print(target, end='')
 
         # Append predicted character to pattern, truncate to usual pattern size, use as new pattern
-        pattern.append(char_idx)
+        pattern.append(target_idx)
         pattern = pattern[1:]
 
-        if is_end(char):
+        if is_end(target):
             if restart_seq:
                 start = np.random.randint(0, n_patterns - 1)
                 pattern = patterns[start]
@@ -72,10 +72,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Load mappings & vocabularies
-    dataX, char_to_int, int_to_char, chars = load_pickle(args.corpus)
+    dataX, target_to_int, int_to_target, targets = load_pickle(args.corpus)
 
     # Load model
     model = torch.load(args.model)
     
     # Generate text
-    gen_text(model, dataX, char_to_int, int_to_char, chars, n_sent=args.n_sent, restart_seq=args.restart_seq)
+    gen_text(model, dataX, target_to_int, int_to_target, targets, n_sent=args.n_sent, restart_seq=args.restart_seq)

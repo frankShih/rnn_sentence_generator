@@ -5,16 +5,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-
+import torch.nn.init as init
+import os
 from .data import parse_corpus, format_data
 from .model import Net
 
 
 def load_data(path, seq_length, batch_size):
-    dataX, dataY, char_to_int, int_to_char, chars = parse_corpus(path, seq_length=seq_length)
-    data = format_data(dataX, dataY, n_classes=len(chars), batch_size=batch_size)
+    dataX, dataY, target_to_int, int_to_target, targets = parse_corpus(path, seq_length=seq_length)
+    data = format_data(dataX, dataY, n_classes=len(targets), batch_size=batch_size)
 
-    return data, dataX, dataY, char_to_int, int_to_char, chars
+    return data, dataX, dataY, target_to_int, int_to_target, targets
 
 def save_pickle(data, path):
     with open(path, 'wb') as f:
@@ -41,24 +42,26 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train seq2seq model')
     parser.add_argument('corpus', type=str, metavar='F',
                         help='training corpus file')
-    parser.add_argument('--seq-length', type=int, default=50, metavar='N',
+    parser.add_argument('--seq-length', type=int, default=1, metavar='N',
                         help='input sequence length (default: 50)')
     parser.add_argument('--batch-size', type=int, default=1, metavar='N',
                         help='training batch size (default: 1)')
     parser.add_argument('--embedding-dim', type=int, default=128, metavar='N',
-                        help='embedding dimension for characters in corpus (default: 128)')
+                        help='embedding dimension for characters/words in corpus (default: 128)')
     parser.add_argument('--hidden-dim', type=int, default=64, metavar='N',
                         help='hidden state dimension (default: 64)')
     parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
                         help='learning rate (default: 0.0001)')
     parser.add_argument('--dropout', type=float, default=0.2, metavar='DR',
                         help='dropout rate (default: 0.2)')
-    parser.add_argument('--epochs', type=int, default=30, metavar='N',
+    parser.add_argument('--epochs', type=int, default=1, metavar='N',
                         help='number of epochs to train (default: 30)')
-    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=100, metavar='N',
                         help='number of batches to wait before logging status (default: 10)')
     parser.add_argument('--save-interval', type=int, default=10, metavar='N',
                         help='number of epochs to wait before saving model (default: 10)')
+    parser.add_argument('--mode', type=str, default='char', metavar='N',
+                        help='char/word level to train model (default: char)')                        
     parser.add_argument('--output', type=str, default='model.bin', metavar='F',
                         help='output model file')
     parser.add_argument('--output-c', type=str, default='corpus.bin', metavar='F',
@@ -66,8 +69,16 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Prepare
-    train_data, dataX, dataY, char_to_int, int_to_char, chars = load_data(args.corpus, seq_length=args.seq_length, batch_size=args.batch_size)
-    model = Net(len(chars), args.embedding_dim, args.hidden_dim, dropout=args.dropout)
+    if args.mode == 'char':
+        train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, seq_length=args.seq_length, batch_size=args.batch_size)
+    elif args.mode == 'word':
+        train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, seq_length=args.seq_length, batch_size=args.batch_size)
+    else:
+        print('non-supported mode for training')
+        os._exit(1) 
+    
+    model = Net(len(targets), args.embedding_dim, args.hidden_dim, dropout=args.dropout)
+    init.xavier_uniform(model.parameters(), gain=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # Train
@@ -79,7 +90,7 @@ if __name__ == '__main__':
             torch.save(model, args.output)
 
     # Save mappings, vocabs, & model
-    save_pickle((dataX, char_to_int, int_to_char, chars), args.output_c)
+    save_pickle((dataX, target_to_int, int_to_target, targets), args.output_c)
 
     model.eval()
     torch.save(model, args.output)
