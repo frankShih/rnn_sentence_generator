@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-import torch.nn.init as init
+
 import os
 from .data import parse_corpus, format_data
 from .model import Net
@@ -78,7 +78,6 @@ if __name__ == '__main__':
         os._exit(1) 
     
     model = Net(len(targets), args.embedding_dim, args.hidden_dim, dropout=args.dropout)
-    #init.xavier_uniform(model.parameters(), gain=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # Train
