@@ -42,21 +42,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train seq2seq model')
     parser.add_argument('corpus', type=str, metavar='F',
                         help='training corpus file')
-    parser.add_argument('--seq-length', type=int, default=1, metavar='N',
+    parser.add_argument('--seq-length', type=int, default=20, metavar='N',
                         help='input sequence length (default: 50)')
-    parser.add_argument('--batch-size', type=int, default=1, metavar='N',
+    parser.add_argument('--batch-size', type=int, default=100, metavar='N',
                         help='training batch size (default: 1)')
-    parser.add_argument('--embedding-dim', type=int, default=128, metavar='N',
+    parser.add_argument('--embedding-dim', type=int, default=265, metavar='N',
                         help='embedding dimension for characters/words in corpus (default: 128)')
-    parser.add_argument('--hidden-dim', type=int, default=64, metavar='N',
+    parser.add_argument('--hidden-dim', type=int, default=128, metavar='N',
                         help='hidden state dimension (default: 64)')
     parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
                         help='learning rate (default: 0.0001)')
     parser.add_argument('--dropout', type=float, default=0.2, metavar='DR',
                         help='dropout rate (default: 0.2)')
-    parser.add_argument('--epochs', type=int, default=1, metavar='N',
+    parser.add_argument('--epochs', type=int, default=50, metavar='N',
                         help='number of epochs to train (default: 30)')
-    parser.add_argument('--log-interval', type=int, default=100, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='number of batches to wait before logging status (default: 10)')
     parser.add_argument('--save-interval', type=int, default=10, metavar='N',
                         help='number of epochs to wait before saving model (default: 10)')
@@ -78,7 +78,7 @@ if __name__ == '__main__':
         os._exit(1) 
     
     model = Net(len(targets), args.embedding_dim, args.hidden_dim, dropout=args.dropout)
-    init.xavier_uniform(model.parameters(), gain=1)
+    #init.xavier_uniform(model.parameters(), gain=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # Train
