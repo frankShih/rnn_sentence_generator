@@ -29,7 +29,7 @@ def parse_corpus(path, seq_length=50):
         seq_out = raw_text[i + seq_length]
         dataX.append([char_to_int[char] for char in seq_in])
         dataY.append(char_to_int[seq_out])
-    
+    print(len(chars), n_chars)
     return (dataX, dataY, char_to_int, int_to_char, chars)
 
 
@@ -62,7 +62,7 @@ def parse_corpus_word(path, seq_length=50):
         seq_out = word_list[i + seq_length]
         dataX.append([word_to_int[w] for w in seq_in])
         dataY.append(word_to_int[seq_out])
-    # print(word_list, len(word_list), len(words))
+    print(len(word_list), len(words))
     # print(dataX[0], dataY[0])
     return (dataX, dataY, word_to_int, int_to_word, words)
 

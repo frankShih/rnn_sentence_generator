@@ -7,14 +7,20 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 import os
-from .data import parse_corpus, format_data
+from .data import parse_corpus, parse_corpus_word, format_data
 from .model import Net
 
 
-def load_data(path, seq_length, batch_size):
-    dataX, dataY, target_to_int, int_to_target, targets = parse_corpus(path, seq_length=seq_length)
+def load_data(path, seq_length, batch_size, mode):
+    if mode == 'char':
+        dataX, dataY, target_to_int, int_to_target, targets = parse_corpus(path, seq_length=seq_length)
+    elif mode == 'word':
+        dataX, dataY, target_to_int, int_to_target, targets = parse_corpus_word(path, seq_length=seq_length)
+    else:
+        print('non-supported mode for training')
+        os._exit(1) 
+    
     data = format_data(dataX, dataY, n_classes=len(targets), batch_size=batch_size)
-
     return data, dataX, dataY, target_to_int, int_to_target, targets
 
 def save_pickle(data, path):
@@ -44,7 +50,7 @@ if __name__ == '__main__':
                         help='training corpus file')
     parser.add_argument('--seq-length', type=int, default=30, metavar='N',
                         help='input sequence length (default: 50)')
-    parser.add_argument('--batch-size', type=int, default=100, metavar='N',
+    parser.add_argument('--batch-size', type=int, default=50, metavar='N',
                         help='training batch size (default: 1)')
     parser.add_argument('--embedding-dim', type=int, default=512, metavar='N',
                         help='embedding dimension for characters/words in corpus (default: 128)')
@@ -56,7 +62,7 @@ if __name__ == '__main__':
                         help='dropout rate (default: 0.2)')
     parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 30)')
-    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=100, metavar='N',
                         help='number of batches to wait before logging status (default: 10)')
     parser.add_argument('--save-interval', type=int, default=10, metavar='N',
                         help='number of epochs to wait before saving model (default: 10)')
@@ -69,13 +75,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Prepare
-    if args.mode == 'char':
-        train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, seq_length=args.seq_length, batch_size=args.batch_size)
-    elif args.mode == 'word':
-        train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, seq_length=args.seq_length, batch_size=args.batch_size)
-    else:
-        print('non-supported mode for training')
-        os._exit(1) 
+    
+    train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, seq_length=args.seq_length, batch_size=args.batch_size, mode=args.mode)
     
     model = Net(len(targets), args.embedding_dim, args.hidden_dim, dropout=args.dropout)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
