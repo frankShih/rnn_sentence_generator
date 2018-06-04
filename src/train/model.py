@@ -19,7 +19,7 @@ class Net(nn.Module):
         self.lstm = nn.LSTM(embedding_dim, hidden_dim, dropout=dropout)  # hidden1 size, hidden2 size
         for name, param in self.lstm.named_parameters():
             if 'bias' in name:
-                nn.init.constant(param, 0.0)
+                nn.init.constant_(param, 0.0)
             elif 'weight' in name:
                 # nn.init.xavier_normal(param)
                 nn.init.xavier_uniform_(param, gain=math.sqrt(2.0))

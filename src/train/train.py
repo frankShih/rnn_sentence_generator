@@ -35,26 +35,26 @@ def train(model, optimizer, epoch, data, log_interval):
 
         # Log training status
         if batch_i % log_interval == 0:
-            print('Train epoch: {} ({:2.0f}%)\tLoss: {:.6f}'.format(epoch, 100. * batch_i / len(data), loss.data[0]))
+            print('Train epoch: {} ({:2.0f}%)\tLoss: {:.6f}'.format(epoch, 100. * batch_i / len(data), loss.data.item()))
 
 if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser(description='Train seq2seq model')
     parser.add_argument('corpus', type=str, metavar='F',
                         help='training corpus file')
-    parser.add_argument('--seq-length', type=int, default=20, metavar='N',
+    parser.add_argument('--seq-length', type=int, default=30, metavar='N',
                         help='input sequence length (default: 50)')
     parser.add_argument('--batch-size', type=int, default=100, metavar='N',
                         help='training batch size (default: 1)')
-    parser.add_argument('--embedding-dim', type=int, default=265, metavar='N',
+    parser.add_argument('--embedding-dim', type=int, default=512, metavar='N',
                         help='embedding dimension for characters/words in corpus (default: 128)')
-    parser.add_argument('--hidden-dim', type=int, default=128, metavar='N',
+    parser.add_argument('--hidden-dim', type=int, default=256, metavar='N',
                         help='hidden state dimension (default: 64)')
-    parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
+    parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                         help='learning rate (default: 0.0001)')
     parser.add_argument('--dropout', type=float, default=0.2, metavar='DR',
                         help='dropout rate (default: 0.2)')
-    parser.add_argument('--epochs', type=int, default=50, metavar='N',
+    parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 30)')
     parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='number of batches to wait before logging status (default: 10)')
@@ -81,15 +81,25 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # Train
-    for epoch in range(args.epochs):
-        train(model, optimizer, epoch, train_data, log_interval=args.log_interval)
+    try:
+        for epoch in range(args.epochs):
+            train(model, optimizer, epoch, train_data, log_interval=args.log_interval)
 
-        if (epoch + 1) % args.save_interval == 0:
-            model.eval()
-            torch.save(model, args.output)
+            if (epoch + 1) % args.save_interval == 0:
+                model.eval()
+                torch.save(model, args.output)
 
-    # Save mappings, vocabs, & model
-    save_pickle((dataX, target_to_int, int_to_target, targets), args.output_c)
+        # Save mappings, vocabs, & model
+        print("Saving...")
+        save_pickle((dataX, target_to_int, int_to_target, targets), args.output_c)
+        model.eval()
+        torch.save(model, args.output)
 
-    model.eval()
-    torch.save(model, args.output)
+    except KeyboardInterrupt:
+        print("Saving before quit...")
+        save_pickle((dataX, target_to_int, int_to_target, targets), args.output_c)
+        model.eval()
+        torch.save(model, args.output)
+
+
+
