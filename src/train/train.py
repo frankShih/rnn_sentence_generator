@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-
+from random import shuffle
 import os
 from .data import parse_corpus, parse_corpus_word, format_data
 from .model import Net
@@ -17,7 +17,7 @@ def load_data(path, seq_length, batch_size, mode):
     elif mode == 'word':
         dataX, dataY, target_to_int, int_to_target, targets = parse_corpus_word(path, seq_length=seq_length)
     else:
-        print('non-supported mode for training')
+        print('Non-supported mode for training. Exiting...')
         os._exit(1) 
     
     data = format_data(dataX, dataY, n_classes=len(targets), batch_size=batch_size)
@@ -27,13 +27,13 @@ def save_pickle(data, path):
     with open(path, 'wb') as f:
         pickle.dump(data, f)
 
-def train(model, optimizer, epoch, data, log_interval):
-    model.train()
-
+def train(model, optimizer, epoch, data, log_interval):            
+    model.train()   # for Dropout & BatchNorm
+    # model.zero_grad() # set this or optimizer to zero
     for batch_i, (seq_in, target) in enumerate(data):
         seq_in, target = Variable(seq_in), Variable(target)
         optimizer.zero_grad()
-
+        
         output = model(seq_in)
         loss = F.cross_entropy(output, target)
         loss.backward()
@@ -56,11 +56,11 @@ if __name__ == '__main__':
                         help='embedding dimension for characters/words in corpus (default: 128)')
     parser.add_argument('--hidden-dim', type=int, default=256, metavar='N',
                         help='hidden state dimension (default: 64)')
-    parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
+    parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
                         help='learning rate (default: 0.0001)')
-    parser.add_argument('--dropout', type=float, default=0.2, metavar='DR',
+    parser.add_argument('--dropout', type=float, default=0.1, metavar='DR',
                         help='dropout rate (default: 0.2)')
-    parser.add_argument('--epochs', type=int, default=10, metavar='N',
+    parser.add_argument('--epochs', type=int, default=50, metavar='N',
                         help='number of epochs to train (default: 30)')
     parser.add_argument('--log-interval', type=int, default=100, metavar='N',
                         help='number of batches to wait before logging status (default: 10)')
@@ -78,12 +78,14 @@ if __name__ == '__main__':
     
     train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, seq_length=args.seq_length, batch_size=args.batch_size, mode=args.mode)
     
-    model = Net(len(targets), args.embedding_dim, args.hidden_dim, dropout=args.dropout)
+    model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets), dropout=args.dropout)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    # criterion = nn.CrossEntropyLoss()
 
     # Train
     try:
         for epoch in range(args.epochs):
+            shuffle(train_data)
             train(model, optimizer, epoch, train_data, log_interval=args.log_interval)
 
             if (epoch + 1) % args.save_interval == 0:

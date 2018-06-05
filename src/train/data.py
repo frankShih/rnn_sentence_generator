@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import jieba
+import os
 
 def parse_corpus(path, seq_length=50):
     '''
@@ -9,10 +10,22 @@ def parse_corpus(path, seq_length=50):
           output: 1 character after input sequence
     '''
 
+    if os.path.isdir(path):
+        print("loading from path...")
+        raw_text = ""
+        for filename in os.listdir(path):
+            print(path+filename)
+            with open(path+'\\'+filename, encoding='UTF-8', mode='r') as f:
+                raw_text += f.read().replace('\n', '')
+    elif os.path.isfile(path):
+        print("loading from file...")
+        with open(path, encoding='UTF-8', mode='r') as f:
+            raw_text = f.read().replace('\n', '')
+    else:  
+        print("Invalid file path. Exiting..." )
+        os._exit(1) 
     # Read text
-    with open(path, encoding='UTF-8', mode='r') as f:
-        raw_text = f.read().replace('\n', '')
-
+    
     # Get unique characters
     chars = sorted(list(set(raw_text)))
 
