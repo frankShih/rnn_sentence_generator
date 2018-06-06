@@ -58,7 +58,7 @@ if __name__ == '__main__':
                         help='hidden state dimension (default: 64)')
     parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
                         help='learning rate (default: 0.0001)')
-    parser.add_argument('--dropout', type=float, default=0.1, metavar='DR',
+    parser.add_argument('--dropout', type=float, default=0.2, metavar='DR',
                         help='dropout rate (default: 0.2)')
     parser.add_argument('--epochs', type=int, default=50, metavar='N',
                         help='number of epochs to train (default: 30)')
@@ -74,8 +74,7 @@ if __name__ == '__main__':
                         help='output corpus related file (mappings & vocab)')
     args = parser.parse_args()
 
-    # Prepare
-    
+    # Prepare    
     train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, seq_length=args.seq_length, batch_size=args.batch_size, mode=args.mode)
     
     model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets), dropout=args.dropout)

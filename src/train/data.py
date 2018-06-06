@@ -55,8 +55,21 @@ def parse_corpus_word(path, seq_length=50):
 
     # Read text            
     word_list = []
-    with open(path, encoding='UTF-8', mode='r') as f:
-        raw_text = f.read().replace('\n', '')
+    if os.path.isdir(path):
+        print("loading from path...")
+        raw_text = ""
+        for filename in os.listdir(path):
+            print(path+filename)
+            with open(path+'\\'+filename, encoding='UTF-8', mode='r') as f:
+                raw_text += f.read().replace('\n', '')
+    elif os.path.isfile(path):
+        print("loading from file...")
+        with open(path, encoding='UTF-8', mode='r') as f:
+            raw_text = f.read().replace('\n', '')
+    else:  
+        print("Invalid file path. Exiting..." )
+        os._exit(1)
+    
     word_list = [w for w in jieba.cut(raw_text, cut_all=False)]
     # Get unique characters
     words = list(set(word_list))
