@@ -10,27 +10,14 @@ Text generation system based on a mixed corpus of 《毛澤東語錄》(Quotatio
 
 ## Usage
 
-###### Mix corpus
-
-```bash
-$ cd src/corpus
-$ python3 mix.py <first-corpus> <second-corpus> --output <output-corpus-text-file>
-
-# Or directly run
-$ ./run.sh
-```
-
 ###### Train
 
 ```bash
 $ cd src
-$ python3 -m train.train <corpus-text-file> 
+$ python3 -m train.train <text-file>
 
 # For more options
 $ python3 -m train.train -h
-
-# Or directly run
-$ ./train.sh
 ```
 
 Outputs:
@@ -46,9 +33,6 @@ $ python3 -m generate_text.gen <corpus-bin-file> <model-bin-file>
 
 # For more options
 $ python3 -m generate_text.gen -h
-
-# Or directly run
-$ ./gen.sh
 ```
 
 ## Structure
@@ -65,7 +49,7 @@ $ ./gen.sh
 ├── output                                          # Results
 │   ├── log                                             # Log files
 │   └── model                                           # Pretrained models
-│       └── slxx-bsxx-edxx-hdxx-lrxx-drxx-epxx              # seq_length, batch_size, embedding_dim, hidden_dim, 
+│       └── slxx-bsxx-edxx-hdxx-lrxx-drxx-epxx              # seq_length, batch_size, embedding_dim, hidden_dim,
 │                                                           # learning_rate, dropout, epochs
 └── src                                             # Source codes
     ├── corpus                                          # Corpus processing
