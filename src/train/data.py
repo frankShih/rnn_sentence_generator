@@ -15,7 +15,7 @@ def parse_corpus(path, seq_length=50):
         raw_text = ""
         for filename in os.listdir(path):
             print(path+filename)
-            with open(path+'\\'+filename, encoding='UTF-8', mode='r') as f:
+            with open(os.path.join(path, filename), encoding='UTF-8', mode='r') as f:
                 raw_text += f.read().replace('\n', '')
     elif os.path.isfile(path):
         print("loading from file...")
@@ -60,7 +60,7 @@ def parse_corpus_word(path, seq_length=50):
         raw_text = ""
         for filename in os.listdir(path):
             print(path+filename)
-            with open(path+'\\'+filename, encoding='UTF-8', mode='r') as f:
+            with open(os.path.join(path, filename), encoding='UTF-8', mode='r') as f:
                 raw_text += f.read().replace('\n', '')
     elif os.path.isfile(path):
         print("loading from file...")
