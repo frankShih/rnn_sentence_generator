@@ -20,7 +20,7 @@ def to_prob(vec):
     s = sum(vec)
     return [v / s for v in vec]
 
-def gen_text(model, patterns, target_to_int, int_to_target, targets, n_sent=10, restart_seq=False):
+def gen_text(model, patterns, target_to_int, int_to_target, targets, temperature=0.8, n_sent=10, restart_seq=False):
     n_patterns = len(patterns)
 
     # Randomly choose a pattern to start text generation
@@ -38,8 +38,14 @@ def gen_text(model, patterns, target_to_int, int_to_target, targets, n_sent=10, 
 
         # Predict next target
         pred = model(seq_in)
+        '''
         pred = to_prob(F.softmax(pred, dim=1).data[0].numpy()) # turn into probability distribution
         target = np.random.choice(targets, p=pred)             # pick char based on probability instead of always picking the highest value
+        target_idx = target_to_int[target]
+        '''
+        pred = pred.data.view(-1).div(temperature).exp()
+        top_i = torch.multinomial(pred, 1)[0]
+        target = targets[top_i]
         target_idx = target_to_int[target]
         print(target, end='')
 

@@ -30,6 +30,25 @@ def save_pickle(data, path):
 def train(model, optimizer, epoch, data, log_interval):            
     model.train()   # for Dropout & BatchNorm
     # model.zero_grad() # set this or optimizer to zero
+
+    '''
+    # truncated to the last K timesteps (for gradient vanishing)
+    for t in range(T):
+        out = model(out)
+        if T - t == K:
+            out.backward()
+            out.detach()
+    out.backward()
+
+    # or
+
+    modelparameter.requires_grad = False
+    for t in range(T):
+        out = model(out)
+        if T - t == K:
+            modelparameter.requires_grad = True
+    out.backward()
+    '''
     for batch_i, (seq_in, target) in enumerate(data):
         seq_in, target = Variable(seq_in), Variable(target)
         optimizer.zero_grad()
@@ -48,19 +67,19 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train seq2seq model')
     parser.add_argument('corpus', type=str, metavar='F',
                         help='training corpus file')
-    parser.add_argument('--seq-length', type=int, default=30, metavar='N',
+    parser.add_argument('--seq-length', type=int, default=200, metavar='N',
                         help='input sequence length (default: 50)')
-    parser.add_argument('--batch-size', type=int, default=50, metavar='N',
+    parser.add_argument('--batch-size', type=int, default=30, metavar='N',
                         help='training batch size (default: 1)')
-    parser.add_argument('--embedding-dim', type=int, default=512, metavar='N',
+    parser.add_argument('--embedding-dim', type=int, default=64, metavar='N',
                         help='embedding dimension for characters/words in corpus (default: 128)')
-    parser.add_argument('--hidden-dim', type=int, default=256, metavar='N',
+    parser.add_argument('--hidden-dim', type=int, default=64, metavar='N',
                         help='hidden state dimension (default: 64)')
-    parser.add_argument('--lr', type=float, default=0.0001, metavar='LR',
+    parser.add_argument('--lr', type=float, default=0.0005, metavar='LR',
                         help='learning rate (default: 0.0001)')
-    parser.add_argument('--dropout', type=float, default=0.2, metavar='DR',
+    parser.add_argument('--dropout', type=float, default=0.1, metavar='DR',
                         help='dropout rate (default: 0.2)')
-    parser.add_argument('--epochs', type=int, default=50, metavar='N',
+    parser.add_argument('--epochs', type=int, default=300, metavar='N',
                         help='number of epochs to train (default: 30)')
     parser.add_argument('--log-interval', type=int, default=100, metavar='N',
                         help='number of batches to wait before logging status (default: 10)')
@@ -77,7 +96,7 @@ if __name__ == '__main__':
     # Prepare    
     train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, seq_length=args.seq_length, batch_size=args.batch_size, mode=args.mode)
     
-    model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets), dropout=args.dropout)
+    model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets), n_layers=2, dropout=args.dropout)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     # criterion = nn.CrossEntropyLoss()
 
