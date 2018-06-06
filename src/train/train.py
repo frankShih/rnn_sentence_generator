@@ -7,19 +7,13 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from random import shuffle
 import os
-from .data import parse_corpus, parse_corpus_word, format_data
+from .data import parse_corpus_word, format_data
 from .model import Net
 
 
 def load_data(path, seq_length, batch_size, mode):
-    if mode == 'char':
-        dataX, dataY, target_to_int, int_to_target, targets = parse_corpus(path, seq_length=seq_length)
-    elif mode == 'word':
-        dataX, dataY, target_to_int, int_to_target, targets = parse_corpus_word(path, seq_length=seq_length)
-    else:
-        print('Non-supported mode for training. Exiting...')
-        os._exit(1) 
-    
+    dataX, dataY, target_to_int, int_to_target, targets = parse_corpus_word(path, mode, seq_length=seq_length)
+
     data = format_data(dataX, dataY, n_classes=len(targets), batch_size=batch_size)
     return data, dataX, dataY, target_to_int, int_to_target, targets
 

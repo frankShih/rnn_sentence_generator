@@ -3,50 +3,8 @@ import torch
 import jieba
 import os
 
-def parse_corpus(path, seq_length=50):
-    '''
-        Parse raw corpus text into input-output pairs
-          input: sequence of characters, 
-          output: 1 character after input sequence
-    '''
 
-    if os.path.isdir(path):
-        print("loading from path...")
-        raw_text = ""
-        for filename in os.listdir(path):
-            print(path+filename)
-            with open(os.path.join(path, filename), encoding='UTF-8', mode='r') as f:
-                raw_text += f.read().replace('\n', '')
-    elif os.path.isfile(path):
-        print("loading from file...")
-        with open(path, encoding='UTF-8', mode='r') as f:
-            raw_text = f.read().replace('\n', '')
-    else:  
-        print("Invalid file path. Exiting..." )
-        os._exit(1) 
-    # Read text
-    
-    # Get unique characters
-    chars = sorted(list(set(raw_text)))
-
-    # Map char to int / int to char
-    char_to_int = dict((c, i) for i, c in enumerate(chars))
-    int_to_char = dict((i, c) for i, c in enumerate(chars))
-    
-    # Prepare training data, for every <seq_length> chars, predict 1 char after the sequence
-    n_chars = len(raw_text)
-    dataX = [] # N x seq_length
-    dataY = [] # N x 1
-    for i in range(0, n_chars - seq_length):
-        seq_in = raw_text[i:i + seq_length]
-        seq_out = raw_text[i + seq_length]
-        dataX.append([char_to_int[char] for char in seq_in])
-        dataY.append(char_to_int[seq_out])
-    print(len(chars), n_chars)
-    return (dataX, dataY, char_to_int, int_to_char, chars)
-
-
-def parse_corpus_word(path, seq_length=50):
+def parse_corpus_word(path, mode, seq_length=50):
     '''
         Parse raw corpus text into input-output pairs
           input: sequence of words, 
@@ -69,8 +27,17 @@ def parse_corpus_word(path, seq_length=50):
     else:  
         print("Invalid file path. Exiting..." )
         os._exit(1)
-    
-    word_list = [w for w in jieba.cut(raw_text, cut_all=False)]
+
+    word_list = []
+
+    if mode == 'char':
+        word_list = sorted(list(set(raw_text)))
+    elif mode == 'word':
+        word_list = [w for w in jieba.cut(raw_text, cut_all=False)]
+    else:
+        print('Non-supported mode for training. Exiting...')
+        os._exit(1)
+
     # Get unique characters
     words = list(set(word_list))
 
@@ -138,7 +105,3 @@ def is_alphabet(uchar):
             return True
     else:
             return False
-
-
-if __name__ == '__main__':
-    parse_corpus_word('C:/Users/han_shih.ASUS/Documents/projects/resurrecting-the-dead-chinese/corpus/glin_utf8.txt', seq_length=50)
