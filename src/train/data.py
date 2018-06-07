@@ -4,7 +4,7 @@ import jieba
 import os
 
 
-def parse_corpus_word(path, mode, seq_length=50):
+def parse_corpus(path, mode, seq_length=50):
     '''
         Parse raw corpus text into input-output pairs
           input: sequence of words, 
@@ -12,7 +12,6 @@ def parse_corpus_word(path, mode, seq_length=50):
     '''
 
     # Read text            
-    word_list = []
     if os.path.isdir(path):
         print("loading from path...")
         raw_text = ""
@@ -28,10 +27,8 @@ def parse_corpus_word(path, mode, seq_length=50):
         print("Invalid file path. Exiting..." )
         os._exit(1)
 
-    word_list = []
-
     if mode == 'char':
-        word_list = sorted(list(set(raw_text)))
+        word_list = list(raw_text)
     elif mode == 'word':
         word_list = [w for w in jieba.cut(raw_text, cut_all=False)]
     else:
@@ -41,22 +38,21 @@ def parse_corpus_word(path, mode, seq_length=50):
     # Get unique characters
     words = list(set(word_list))
 
-
     # Map char to int / int to char
     word_to_int = dict((c, i) for i, c in enumerate(words))
     int_to_word = dict((i, c) for i, c in enumerate(words))
     
-    # Prepare training data, for every <seq_length> chars, predict 1 char after the sequence
-    n_words = len(word_list)
+    # Prepare training data, every <seq_length> sequence, predict 1 char after it
     dataX = [] # N x seq_length
     dataY = [] # N x 1
-    for i in range(0, n_words - seq_length):
+    for i in range(0, len(word_list) - seq_length):
         seq_in = word_list[i:i + seq_length]
         seq_out = word_list[i + seq_length]
         dataX.append([word_to_int[w] for w in seq_in])
         dataY.append(word_to_int[seq_out])
     print(len(word_list), len(words))
-    # print(dataX[0], dataY[0])
+    # print(len(dataX), len(dataX[0]))
+    # print(len(dataY), dataY[0])    
     return (dataX, dataY, word_to_int, int_to_word, words)
 
 

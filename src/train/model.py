@@ -39,16 +39,21 @@ class Net(nn.Module):
 
 
     def forward(self, input):
+        # print('forwarding~~~')
+        input = torch.unsqueeze(input, 0)
+        # print(input.shape)
+        # print(input.t().shape)
         input = self.encoder(input.t()) # LSTM takes 3D inputs (timesteps, batch, features)
         # encoder = F.relu(encoder)          #                    = (seq_length, batch_size, embedding_dim)
+        # print(input.shape)
         # pass hidden param help speed up training
         rnn_out, _ = self.rnn(input)      # Each timestep outputs 1 hidden_state
         # rnn_out = F.relu(rnn_out)              # Combined in lstm_out = (seq_length, batch_size, hidden_dim) 
-        
+        # print(rnn_out.shape)
         ht = rnn_out[-1]                        # ht = last hidden state = (batch_size, hidden_dim)
                                                  # Use the last hidden state to predict the following character        
-
+        # print(ht.shape)
         out = self.decoder(ht)                # Fully-connected layer, predict (batch_size, input_dim)
-
+        # print(out.shape)
         return out
     

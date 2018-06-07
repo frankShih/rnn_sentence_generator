@@ -7,13 +7,13 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from random import shuffle
 import os
-from .data import parse_corpus_word, format_data
+from .data import parse_corpus#, format_data
 from .model import Net
 
 def load_data(path, seq_length, batch_size, mode):
-    dataX, dataY, target_to_int, int_to_target, targets = parse_corpus_word(path, mode, seq_length=seq_length)
-    data = format_data(dataX, dataY, n_classes=len(targets), batch_size=batch_size)
-    return data, dataX, dataY, target_to_int, int_to_target, targets
+    dataX, dataY, target_to_int, int_to_target, targets = parse_corpus(path, mode, seq_length=seq_length)
+    # data = format_data(dataX, dataY, n_classes=len(targets), batch_size=batch_size)
+    return dataX, dataY, target_to_int, int_to_target, targets
 
 def save_pickle(data, path):
     with open(path, 'wb') as f:
@@ -24,9 +24,11 @@ def load_pickle(path):
         data = pickle.load(f)
     return data
 
-def train(model, optimizer, epoch, data, log_interval):            
+def train(data, batch_size, log_interval):            
     model.train()   # for Dropout & BatchNorm
     # model.zero_grad() # set this or optimizer to zero
+    loss = 0
+    counter = 0
 
     '''
     # truncated to the last K timesteps (for gradient vanishing)
@@ -46,22 +48,24 @@ def train(model, optimizer, epoch, data, log_interval):
             modelparameter.requires_grad = True
     out.backward()
     '''
-    for batch_i, (seq_in, target) in enumerate(data):
-        seq_in, target = Variable(seq_in), Variable(target)
-        optimizer.zero_grad()
+    
+    for ind, (seq_in, target) in enumerate(data):
+        # print(seq_in,target)        
+        seq_in, target = Variable(torch.LongTensor(seq_in)), Variable(torch.LongTensor([target]))        
+        optimizer.zero_grad()        
         
-        output = model(seq_in)
-        loss = F.cross_entropy(output, target)
-        # print(output.size())
-        # print(output)
-        # print(target.size())
-        # print(target)
-        loss.backward()
-        optimizer.step()
+        output = model(seq_in)        
+        loss += F.cross_entropy(output, target)
+        counter +=1
 
-        # Log training status
-        if batch_i % log_interval == 0:
-            print('Train epoch: {} ({:2.0f}%)\tLoss: {:.6f}'.format(epoch, 100. * batch_i / len(data), loss.data.item()))
+        if ind%(batch_size) == 0 and ind:
+            loss.backward()
+            optimizer.step()
+            if ind%(batch_size*log_interval) == 0:
+                print('Train epoch: {} ({:2.0f}%)\tLoss: {:.6f}' \
+                        .format(epoch, 100. * ind / len(data), loss.data.item()/counter))
+            counter = 0
+            loss = 0
 
 if __name__ == '__main__':
     # Parse arguments
@@ -76,17 +80,17 @@ if __name__ == '__main__':
                         help='input sequence length (default: 50)')
     parser.add_argument('--batch-size', type=int, default=30, metavar='N',
                         help='training batch size (default: 1)')
-    parser.add_argument('--embedding-dim', type=int, default=64, metavar='N',
+    parser.add_argument('--embedding-dim', type=int, default=128, metavar='N',
                         help='embedding dimension for characters/words in corpus (default: 128)')
     parser.add_argument('--hidden-dim', type=int, default=64, metavar='N',
                         help='hidden state dimension (default: 64)')
-    parser.add_argument('--lr', type=float, default=0.0005, metavar='LR',
+    parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                         help='learning rate (default: 0.0001)')
     parser.add_argument('--dropout', type=float, default=0.1, metavar='DR',
                         help='dropout rate (default: 0.2)')
-    parser.add_argument('--epochs', type=int, default=300, metavar='N',
+    parser.add_argument('--epochs', type=int, default=100, metavar='N',
                         help='number of epochs to train (default: 30)')
-    parser.add_argument('--log-interval', type=int, default=100, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='number of batches to wait before logging status (default: 10)')
     parser.add_argument('--save-interval', type=int, default=10, metavar='N',
                         help='number of epochs to wait before saving model (default: 10)')
@@ -98,8 +102,6 @@ if __name__ == '__main__':
                         help='output corpus related file (mappings & vocab)')
     args = parser.parse_args()
 
-    # Prepare
-
     # Load mappings & vocabularies
     print("####################################################")
     print("# loading... " + os.path.abspath(args.corpusbin))
@@ -109,13 +111,13 @@ if __name__ == '__main__':
 
     if os.path.exists(args.corpusbin) and os.path.exists(args.modelbin):
         dataX, dataY, target_to_int, int_to_target, targets = load_pickle(args.corpusbin)
-        train_data = format_data(dataX, dataY, n_classes=len(targets), batch_size=args.batch_size)
+        # train_data = format_data(dataX, dataY, n_classes=len(targets), batch_size=args.batch_size)
         model = torch.load(args.modelbin)
     else:
         print("corpus.bin or model.bin not found")
         comfirm = input("Re-train model.bin and corpus.bin? [Y/n]")
         if comfirm == "y" or comfirm == "Y":
-            train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus,
+            dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus,
                                                                                         seq_length=args.seq_length,
                                                                                         batch_size=args.batch_size,
                                                                                         mode=args.mode)
@@ -126,15 +128,16 @@ if __name__ == '__main__':
             print("Exit.")
             os._exit(1)
 
-
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     # criterion = nn.CrossEntropyLoss()
 
     # Train
     try:
         for epoch in range(args.epochs):
+            # shuffle(train_data)
+            train_data = list(zip(dataX, dataY))
             shuffle(train_data)
-            train(model, optimizer, epoch, train_data, log_interval=args.log_interval)
+            train(train_data, batch_size=args.batch_size, log_interval=args.log_interval)
 
             if (epoch + 1) % args.save_interval == 0:
                 model.eval()
