@@ -10,16 +10,19 @@ import os
 from .data import parse_corpus_word, format_data
 from .model import Net
 
-
 def load_data(path, seq_length, batch_size, mode):
     dataX, dataY, target_to_int, int_to_target, targets = parse_corpus_word(path, mode, seq_length=seq_length)
-
     data = format_data(dataX, dataY, n_classes=len(targets), batch_size=batch_size)
     return data, dataX, dataY, target_to_int, int_to_target, targets
 
 def save_pickle(data, path):
     with open(path, 'wb') as f:
         pickle.dump(data, f)
+
+def load_pickle(path):
+    with open(path, 'rb') as f:
+        data = pickle.load(f)
+    return data
 
 def train(model, optimizer, epoch, data, log_interval):            
     model.train()   # for Dropout & BatchNorm
@@ -49,6 +52,10 @@ def train(model, optimizer, epoch, data, log_interval):
         
         output = model(seq_in)
         loss = F.cross_entropy(output, target)
+        # print(output.size())
+        # print(output)
+        # print(target.size())
+        # print(target)
         loss.backward()
         optimizer.step()
 
@@ -59,6 +66,10 @@ def train(model, optimizer, epoch, data, log_interval):
 if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser(description='Train seq2seq model')
+    parser.add_argument('--corpusbin', type=str, default="corpus.bin", metavar='F',
+                        help='corpus bin (default: corpus.bin)')
+    parser.add_argument('--modelbin', type=str, default="model.bin", metavar='F',
+                        help='model bin (default: model.bin)')
     parser.add_argument('corpus', type=str, metavar='F',
                         help='training corpus file')
     parser.add_argument('--seq-length', type=int, default=200, metavar='N',
@@ -87,10 +98,35 @@ if __name__ == '__main__':
                         help='output corpus related file (mappings & vocab)')
     args = parser.parse_args()
 
-    # Prepare    
-    train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, seq_length=args.seq_length, batch_size=args.batch_size, mode=args.mode)
-    
-    model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets), n_layers=2, dropout=args.dropout)
+    # Prepare
+
+    # Load mappings & vocabularies
+    print("####################################################")
+    print("# loading... " + os.path.abspath(args.corpusbin))
+    print("# loading... " + os.path.abspath(args.modelbin))
+    print("####################################################")
+    print()
+
+    if os.path.exists(args.corpusbin) and os.path.exists(args.modelbin):
+        dataX, dataY, target_to_int, int_to_target, targets = load_pickle(args.corpusbin)
+        train_data = format_data(dataX, dataY, n_classes=len(targets), batch_size=args.batch_size)
+        model = torch.load(args.modelbin)
+    else:
+        print("corpus.bin or model.bin not found")
+        comfirm = input("Re-train model.bin and corpus.bin? [Y/n]")
+        if comfirm == "y" or comfirm == "Y":
+            train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus,
+                                                                                        seq_length=args.seq_length,
+                                                                                        batch_size=args.batch_size,
+                                                                                        mode=args.mode)
+            model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
+                        n_layers=2,
+                        dropout=args.dropout)
+        else:
+            print("Exit.")
+            os._exit(1)
+
+
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     # criterion = nn.CrossEntropyLoss()
 
@@ -106,15 +142,12 @@ if __name__ == '__main__':
 
         # Save mappings, vocabs, & model
         print("Saving...")
-        save_pickle((dataX, target_to_int, int_to_target, targets), args.output_c)
+        save_pickle((dataX, dataY, target_to_int, int_to_target, targets), args.output_c)
         model.eval()
         torch.save(model, args.output)
 
     except KeyboardInterrupt:
         print("Saving before quit...")
-        save_pickle((dataX, target_to_int, int_to_target, targets), args.output_c)
+        save_pickle((dataX, dataY, target_to_int, int_to_target, targets), args.output_c)
         model.eval()
         torch.save(model, args.output)
-
-
-

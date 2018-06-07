@@ -78,7 +78,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Load mappings & vocabularies
-    dataX, target_to_int, int_to_target, targets = load_pickle(args.corpus)
+    dataX, dataY, target_to_int, int_to_target, targets = load_pickle(args.corpus)
 
     # Load model
     model = torch.load(args.model)
