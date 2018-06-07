@@ -18,11 +18,11 @@ def parse_corpus(path, mode, seq_length=50):
         for filename in os.listdir(path):
             print(path+filename)
             with open(os.path.join(path, filename), encoding='UTF-8', mode='r') as f:
-                raw_text += f.read().replace('\n', '')
+                raw_text += f.read().strip(' \t\n\r　')
     elif os.path.isfile(path):
         print("loading from file...")
         with open(path, encoding='UTF-8', mode='r') as f:
-            raw_text = f.read().replace('\n', '')
+            raw_text = f.read().strip(' \t\n\r　')
     else:  
         print("Invalid file path. Exiting..." )
         os._exit(1)
