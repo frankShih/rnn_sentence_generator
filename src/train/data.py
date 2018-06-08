@@ -38,8 +38,6 @@ def parse_corpus(path, mode, seq_length=50):
         print('Non-supported mode for training. Exiting...')
         os._exit(1)
 
-    print(raw_text)
-
     # Get unique characters
     words = list(set(word_list))
 
