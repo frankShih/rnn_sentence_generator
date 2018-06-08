@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import jieba
 import os
+import re
 
 
 def parse_corpus(path, mode, seq_length=50):
@@ -11,6 +12,8 @@ def parse_corpus(path, mode, seq_length=50):
           output: 1 word after input sequence
     '''
 
+    rm = re.compile(r"\s+", re.MULTILINE)
+
     # Read text            
     if os.path.isdir(path):
         print("loading from path...")
@@ -18,11 +21,11 @@ def parse_corpus(path, mode, seq_length=50):
         for filename in os.listdir(path):
             print(path+filename)
             with open(os.path.join(path, filename), encoding='UTF-8', mode='r') as f:
-                raw_text += f.read().strip(' \t\n\r　')
+                raw_text += rm.sub("", f.read())
     elif os.path.isfile(path):
         print("loading from file...")
         with open(path, encoding='UTF-8', mode='r') as f:
-            raw_text = f.read().strip(' \t\n\r　')
+            raw_text = rm.sub("", f.read())
     else:  
         print("Invalid file path. Exiting..." )
         os._exit(1)
@@ -34,6 +37,8 @@ def parse_corpus(path, mode, seq_length=50):
     else:
         print('Non-supported mode for training. Exiting...')
         os._exit(1)
+
+    print(raw_text)
 
     # Get unique characters
     words = list(set(word_list))
@@ -83,21 +88,12 @@ def format_data(dataX, dataY, n_classes, batch_size=64):
 
 
 def is_chinese(uchar):
-    if uchar >= u'/u4e00' and uchar<=u'/u9fa5':
-            return True
-    else:
-            return False
+    return uchar >= u'/u4e00' and uchar<=u'/u9fa5'
 
 
 def is_number(uchar):
-    if uchar >= u'/u0030' and uchar<=u'/u0039':
-            return True
-    else:
-            return False
+    return uchar >= u'/u0030' and uchar<=u'/u0039'
 
 
 def is_alphabet(uchar):
-    if (uchar >= u'/u0041' and uchar<=u'/u005a') or (uchar >= u'/u0061' and uchar<=u'/u007a'):
-            return True
-    else:
-            return False
+    return (uchar >= u'/u0041' and uchar<=u'/u005a') or (uchar >= u'/u0061' and uchar<=u'/u007a')
