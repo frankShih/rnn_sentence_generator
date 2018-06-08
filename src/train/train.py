@@ -8,7 +8,7 @@ from torch.autograd import Variable
 from random import shuffle
 import os
 from .data import parse_corpus#, format_data
-from .model import Net
+from .model import Net, BiRNN
 
 def load_data(path, seq_length, batch_size, mode):
     dataX, dataY, target_to_int, int_to_target, targets = parse_corpus(path, mode, seq_length=seq_length)
@@ -53,8 +53,9 @@ def train(data, batch_size, log_interval):
         # print(seq_in,target)        
         seq_in, target = Variable(torch.LongTensor(seq_in)), Variable(torch.LongTensor([target]))        
         optimizer.zero_grad()        
-        
-        output = model(seq_in)        
+
+        output = model(seq_in)
+        # print(output.shape, target.shape)        
         loss += F.cross_entropy(output, target)
         counter +=1
 
@@ -121,9 +122,12 @@ if __name__ == '__main__':
                                                                                         seq_length=args.seq_length,
                                                                                         batch_size=args.batch_size,
                                                                                         mode=args.mode)
-            model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
+            # model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
+            #             n_layers=2,
+            #             dropout=args.dropout)
+            model = BiRNN(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
                         n_layers=2,
-                        dropout=args.dropout)
+                        dropout=args.dropout)                        
         else:
             print("Exit.")
             os._exit(1)
