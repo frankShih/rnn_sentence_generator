@@ -65,7 +65,7 @@ def train(data, batch_size, log_interval):
             loss.backward()
             optimizer.step()
             if ind%(batch_size*log_interval) == 0:
-                print('Train epoch: {} ({:2.0f}%)\tLoss: {:.6f}' \
+                print('Train epoch: {:02}.{:2.0f}\tLoss: {:.6f}' \
                         .format(epoch, 100. * ind / len(data), loss.data.item()/counter))
             counter = 0
             loss = 0
