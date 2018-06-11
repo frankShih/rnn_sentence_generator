@@ -13,7 +13,7 @@ def load_pickle(path):
     return data
 
 def is_end(c):
-    end_tokens = ['。', '？', '！', '.', '?', '!']
+    end_tokens = ['。', '？', '！', '.', '?', '!', '』', '」',')', '）']
     return c in end_tokens
 
 def to_prob(vec):
@@ -27,14 +27,14 @@ def gen_text(model, patterns, target_to_int, int_to_target, targets, temperature
     start = np.random.randint(0, n_patterns - 1)
     pattern = patterns[start]
 
-    # Start generation until n_sent sentences generated 
+    # Start generation until n_sent sentences generated
     cnt = 0
-    while cnt < n_sent: 
+    while cnt < n_sent:
         # Format input pattern
         seq_in = np.array(pattern)
         # seq_in = seq_in.reshape(1, -1) # batch_size = 1
 
-        seq_in = Variable(torch.LongTensor(seq_in))        
+        seq_in = Variable(torch.LongTensor(seq_in))
         # Predict next target
         pred = model(seq_in)
         '''
@@ -58,8 +58,8 @@ def gen_text(model, patterns, target_to_int, int_to_target, targets, temperature
                 pattern = patterns[start]
                 print()
 
-            cnt += 1 
-    
+            cnt += 1
+
     if not restart_seq:
         print()
 
@@ -71,7 +71,7 @@ if __name__ == '__main__':
                         help='model for text generation')
     parser.add_argument('--n-sent', type=int, default=10, metavar='N',
                         help='number of sentences to generate (default: 10)')
-    parser.add_argument('--restart-seq', action='store_true', 
+    parser.add_argument('--restart-seq', action='store_true',
                         help='whether to randomly pick a new sequence to start the next sentence generation (default: F)')
 
     args = parser.parse_args()
@@ -81,6 +81,6 @@ if __name__ == '__main__':
 
     # Load model
     model = torch.load(args.model)
-    
+
     # Generate text
     gen_text(model, dataX, target_to_int, int_to_target, targets, n_sent=args.n_sent, restart_seq=args.restart_seq)

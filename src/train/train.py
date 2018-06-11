@@ -111,26 +111,35 @@ if __name__ == '__main__':
     print()
 
     if os.path.exists(args.corpusbin) and os.path.exists(args.modelbin):
-        dataX, dataY, target_to_int, int_to_target, targets = load_pickle(args.corpusbin)
-        # train_data = format_data(dataX, dataY, n_classes=len(targets), batch_size=args.batch_size)
-        model = torch.load(args.modelbin)
-    else:
-        print("corpus.bin or model.bin not found")
-        comfirm = input("Re-train model.bin and corpus.bin? [Y/n]")
+        comfirm = input("Train with existing model.bin and corpus.bin? [Y/n]")
         if comfirm == "y" or comfirm == "Y":
-            dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus,
-                                                                                        seq_length=args.seq_length,
-                                                                                        batch_size=args.batch_size,
-                                                                                        mode=args.mode)
+            dataX, dataY, target_to_int, int_to_target, targets = load_pickle(args.corpusbin)
+            # train_data = format_data(dataX, dataY, n_classes=len(targets), batch_size=args.batch_size)
+            model = torch.load(args.modelbin)
+        else:
+            print("Re-train the model ...")
+            dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, 
+                                                                            seq_length=args.seq_length, 
+                                                                            batch_size=args.batch_size, 
+                                                                            mode=args.mode)
             # model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
             #             n_layers=2,
             #             dropout=args.dropout)
             model = BiRNN(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
+                            n_layers=2,
+                            dropout=args.dropout)
+    else:
+        print("Train a new model ...")
+        dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus,
+                                                                        seq_length=args.seq_length,
+                                                                        batch_size=args.batch_size,
+                                                                        mode=args.mode)
+        # model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
+        #             n_layers=2,
+        #             dropout=args.dropout)
+        model = BiRNN(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
                         n_layers=2,
-                        dropout=args.dropout)                        
-        else:
-            print("Exit.")
-            os._exit(1)
+                        dropout=args.dropout)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     # criterion = nn.CrossEntropyLoss()

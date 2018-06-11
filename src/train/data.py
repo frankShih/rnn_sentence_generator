@@ -8,25 +8,31 @@ import re
 def parse_corpus(path, mode, seq_length=50):
     '''
         Parse raw corpus text into input-output pairs
-          input: sequence of words, 
+          input: sequence of words,
           output: 1 word after input sequence
     '''
 
     rm = re.compile(r"\s+", re.MULTILINE)
 
-    # Read text            
+    # Read text
+    raw_text = ""
     if os.path.isdir(path):
         print("loading from path...")
-        raw_text = ""
         for filename in os.listdir(path):
             print(path+filename)
             with open(os.path.join(path, filename), encoding='UTF-8', mode='r') as f:
-                raw_text += rm.sub("", f.read())
+                 temp = rm.sub("", f.read())
+                 temp = re.sub(r"[『“]", r"「", temp)
+                 temp = re.sub(r"[』”]", r"」", temp)
+                 raw_text += temp
     elif os.path.isfile(path):
         print("loading from file...")
         with open(path, encoding='UTF-8', mode='r') as f:
-            raw_text = rm.sub("", f.read())
-    else:  
+            temp = rm.sub("", f.read())
+            temp = re.sub(r"[『“]", r"「", temp)
+            temp = re.sub(r"[』”]", r"」", temp)
+            raw_text += temp
+    else:
         print("Invalid file path. Exiting..." )
         os._exit(1)
 
@@ -44,7 +50,7 @@ def parse_corpus(path, mode, seq_length=50):
     # Map char to int / int to char
     word_to_int = dict((c, i) for i, c in enumerate(words))
     int_to_word = dict((i, c) for i, c in enumerate(words))
-    
+
     # Prepare training data, every <seq_length> sequence, predict 1 char after it
     dataX = [] # N x seq_length
     dataY = [] # N x 1
@@ -55,7 +61,7 @@ def parse_corpus(path, mode, seq_length=50):
         dataY.append(word_to_int[seq_out])
     print(len(word_list), len(words))
     # print(len(dataX), len(dataX[0]))
-    # print(len(dataY), dataY[0])    
+    # print(len(dataY), dataY[0])
     return (dataX, dataY, word_to_int, int_to_word, words)
 
 
