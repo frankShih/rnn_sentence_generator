@@ -4,7 +4,6 @@ import jieba
 import os
 import re
 
-
 def parse_corpus(path, mode, seq_length=50):
     '''
         Parse raw corpus text into input-output pairs

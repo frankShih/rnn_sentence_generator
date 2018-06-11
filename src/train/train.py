@@ -10,6 +10,8 @@ import os
 from .data import parse_corpus#, format_data
 from .model import Net, BiRNN
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 def load_data(path, seq_length, batch_size, mode):
     dataX, dataY, target_to_int, int_to_target, targets = parse_corpus(path, mode, seq_length=seq_length)
     # data = format_data(dataX, dataY, n_classes=len(targets), batch_size=batch_size)
@@ -24,8 +26,8 @@ def load_pickle(path):
         data = pickle.load(f)
     return data
 
-def train(data, batch_size, log_interval):            
-    model.train()   # for Dropout & BatchNorm
+def train(data, batch_size, log_interval):
+    model.train().to(device)   # for Dropout & BatchNorm
     # model.zero_grad() # set this or optimizer to zero
     loss = 0
     counter = 0
@@ -48,15 +50,15 @@ def train(data, batch_size, log_interval):
             modelparameter.requires_grad = True
     out.backward()
     '''
-    
+
     for ind, (seq_in, target) in enumerate(data):
-        # print(seq_in,target)        
-        seq_in, target = Variable(torch.LongTensor(seq_in)), Variable(torch.LongTensor([target]))        
-        optimizer.zero_grad()        
+        # print(seq_in,target)
+        seq_in, target = Variable(torch.LongTensor(seq_in)), Variable(torch.LongTensor([target])).to(device)
+        optimizer.zero_grad()
 
         output = model(seq_in)
-        # print(output.shape, target.shape)        
-        loss += F.cross_entropy(output, target)
+        # print(output.shape, target.shape)
+        loss += F.cross_entropy(output, target).to(device)
         counter +=1
 
         if ind%(batch_size) == 0 and ind:
@@ -96,7 +98,7 @@ if __name__ == '__main__':
     parser.add_argument('--save-interval', type=int, default=10, metavar='N',
                         help='number of epochs to wait before saving model (default: 10)')
     parser.add_argument('--mode', type=str, default='char', metavar='N',
-                        help='char/word level to train model (default: char)')                        
+                        help='char/word level to train model (default: char)')
     parser.add_argument('--output', type=str, default='model.bin', metavar='F',
                         help='output model file')
     parser.add_argument('--output-c', type=str, default='corpus.bin', metavar='F',
@@ -118,9 +120,9 @@ if __name__ == '__main__':
             model = torch.load(args.modelbin)
         else:
             print("Re-train the model ...")
-            dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, 
-                                                                            seq_length=args.seq_length, 
-                                                                            batch_size=args.batch_size, 
+            dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus,
+                                                                            seq_length=args.seq_length,
+                                                                            batch_size=args.batch_size,
                                                                             mode=args.mode)
             # model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
             #             n_layers=2,
