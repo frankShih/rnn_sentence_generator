@@ -33,11 +33,11 @@ def train(data, log_interval):
     loss = 0
     counter = 0
     for batch_i, (seq_in, target) in enumerate(data):
-        seq_in, target = Variable(seq_in), Variable(target)
+        seq_in, target = Variable(seq_in).to(device), Variable(target).to(device)
         optimizer.zero_grad()
 
         output = model(seq_in)
-        loss = F.cross_entropy(output, target)
+        loss = F.cross_entropy(output, target).to(device)
         # print(output.size())
         # print(output)
         # print(target.size())

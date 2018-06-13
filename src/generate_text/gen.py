@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def load_pickle(path):
     with open(path, 'rb') as f:
@@ -33,7 +34,7 @@ def gen_text(model, patterns, target_to_int, int_to_target, targets, temperature
         # Format input pattern
         seq_in = np.array(pattern)
         seq_in = seq_in.reshape(1, -1) # batch_size = 1
-        seq_in = Variable(torch.LongTensor(seq_in))
+        seq_in = Variable(torch.LongTensor(seq_in)).to(device)
         # Predict next target
         pred = model(seq_in)
         '''
