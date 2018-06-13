@@ -67,8 +67,6 @@ def parse_corpus(path, mode, batch_size, seq_length=50):
         dataX.append([word_to_int[w] for w in seq_in])
         dataY.append(word_to_int[seq_out])
     print(len(word_list), len(words))
-    # print(len(dataX), len(dataX[0]))
-    # print(len(dataY), dataY[0])
 
     # For simplicity, discard trailing data not fitting into batch_size
     n_patterns = len(dataY)
@@ -76,13 +74,11 @@ def parse_corpus(path, mode, batch_size, seq_length=50):
     X = dataX[:n_patterns]
     Y = dataY[:n_patterns]
 
-    # Parse X
     X = np.array(X)
     _, seq_length = X.shape
     X = X.reshape(-1, batch_size, seq_length)
     X = torch.LongTensor(X)
 
-    # Parse Y
     Y = np.array(Y)
     Y = Y.reshape(-1, batch_size)
     Y = torch.LongTensor(Y)

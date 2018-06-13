@@ -30,8 +30,6 @@ def load_pickle(path):
 def train(data, log_interval):
     model.train().to(device)   # for Dropout & BatchNorm
     # model.zero_grad() # set this or optimizer to zero
-    loss = 0
-    counter = 0
     for batch_i, (seq_in, target) in enumerate(data):
         seq_in, target = Variable(seq_in).to(device), Variable(target).to(device)
         optimizer.zero_grad()
@@ -50,6 +48,8 @@ def train(data, log_interval):
             print('Train epoch: {} ({:2.0f}%)\tLoss: {:.6f}'.format(epoch, 100. * batch_i / len(data), loss.data.item()))
 
     '''
+    loss = 0
+    counter = 0
     for ind, (seq_in, target) in enumerate(data):
         # print(seq_in,target)
         seq_in, target = Variable(torch.LongTensor(seq_in)), Variable(torch.LongTensor([target]))
@@ -125,24 +125,28 @@ if __name__ == '__main__':
                                                                             seq_length=args.seq_length,
                                                                             batch_size=args.batch_size,
                                                                             mode=args.mode)
-            model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
-                        n_layers=2,
-                        dropout=args.dropout)
-            # model = BiRNN(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
-            #                 n_layers=2,
-            #                 dropout=args.dropout)
+            # model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
+            #             rnn_model='GRU',
+            #             n_layers=2,
+            #             dropout=args.dropout)
+            model = BiRNN(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
+                            rnn_model='LSTM',
+                            n_layers=2,
+                            dropout=args.dropout)
     else:
         print("Train a new model ...")
         train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus,
                                                                         seq_length=args.seq_length,
                                                                         batch_size=args.batch_size,
                                                                         mode=args.mode)
-        model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
-                    n_layers=2,
-                    dropout=args.dropout)
-        # model = BiRNN(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
-        #                 n_layers=2,
-        #                 dropout=args.dropout)
+        # model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
+        #             rnn_model='GRU',
+        #             n_layers=2,
+        #             dropout=args.dropout)
+        model = BiRNN(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
+                        rnn_model='LSTM',
+                        n_layers=2,
+                        dropout=args.dropout)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     # criterion = nn.CrossEntropyLoss()

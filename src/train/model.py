@@ -8,21 +8,27 @@ from torch.autograd import Variable
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class Net(nn.Module):
-    def __init__(self, input_dim, embedding_dim, hidden_dim, output_dim, n_layers=1, dropout=0.2):
+    def __init__(self, input_dim, embedding_dim, hidden_dim, output_dim, rnn_model='LSTM', n_layers=1, dropout=0.2):
         super(Net, self).__init__()
         self.input_size = input_dim
-        self.embedding_size = embedding_dim
         self.hidden_size = hidden_dim
         self.output_size = output_dim
         self.n_layers = n_layers
 
-        self.encoder = nn.Embedding(self.input_size, self.embedding_size).to(device)  # input size, hidden1 size
+        self.encoder = nn.Embedding(self.input_size, embedding_dim).to(device)  # input size, hidden1 size
         # print(self.encoder.weight)
         # nn.init.xavier_uniform_(self.encoder.weight, gain=5/3)
 
         # set batch_first=true,  input/output tensors are provided as (batch, seq, feature)
-        self.rnn = nn.GRU(input_size=self.embedding_size, hidden_size=self.hidden_size, num_layers=self.n_layers,
-                            dropout=dropout, batch_first=True, bidirectional=False).to(device)
+        if rnn_model == 'LSTM':
+            # set batch_first=true,  input/output tensors are provided as (batch, seq, feature)
+            self.rnn = nn.LSTM(input_size=embedding_dim, hidden_size=self.hidden_size, num_layers=self.n_layers,
+                                dropout=dropout, batch_first=True, bidirectional=False).to(device)
+        elif rnn_model == 'GRU':
+            self.rnn = nn.GRU(input_size=embedding_dim, hidden_size=self.hidden_size, num_layers=self.n_layers,
+                                dropout=dropout, batch_first=True, bidirectional=False).to(device)
+        else:
+            raise LookupError('Currently only support LSTM and GRU, or trying self-defined RNN-cell')
 
         # for name, param in self.lstm.named_parameters():
         #     if 'bias' in name:
@@ -46,7 +52,7 @@ class Net(nn.Module):
         # ht = rnn_out[-1]                # ht = last hidden state = (batch_size, hidden_dim)
                                           # Use the last hidden state to predict the following character
         # print(ht.shape)
-        out = self.decoder(rnn_out[-1, :, :]).to(device)   # Fully-connected layer, predict (batch_size, input_dim)
+        out = self.decoder(rnn_out[-1, :, :])   # Fully-connected layer, predict (batch_size, input_dim)
         # print(out.shape)
         return out
 
@@ -54,27 +60,36 @@ class Net(nn.Module):
 
 # Bidirectional recurrent neural network (many-to-many)
 class BiRNN(nn.Module):
-    def __init__(self, input_size, embedding_dim, hidden_size, output_size, n_layers=1, dropout=0.2):
+    def __init__(self, input_size, embedding_dim, hidden_size, output_size, rnn_model='LSTM', n_layers=1, dropout=0.2):
         super(BiRNN, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = n_layers
         self.encoder = nn.Embedding(input_size, embedding_dim)
-        self.gru = nn.GRU(embedding_dim, self.hidden_size, num_layers=self.num_layers, batch_first=True, bidirectional=True, dropout=dropout).to(device)
-        self.fc = nn.Linear(hidden_size*2, output_size)  # 2 for bidirection
+
+        if rnn_model == 'LSTM':
+            # set batch_first=true,  input/output tensors are provided as (batch, seq, feature)
+            self.rnn = nn.LSTM(embedding_dim, self.hidden_size, num_layers=self.num_layers, batch_first=True, bidirectional=True, dropout=dropout).to(device)
+        elif rnn_model == 'GRU':
+            self.rnn = nn.GRU(embedding_dim, self.hidden_size, num_layers=self.num_layers, batch_first=True, bidirectional=True, dropout=dropout).to(device)
+        else:
+            raise LookupError('Currently only support LSTM and GRU, or trying self-defined RNN-cell')
+
+        self.fc = nn.Linear(hidden_size*2, output_size).to(device)  # 2 for bidirection
 
     def forward(self, input):
-        input = self.encoder(input.t()) # LSTM takes 3D inputs (timesteps, batch, features)
+        input = self.encoder(input.t()).to(device) # LSTM takes 3D inputs (timesteps, batch, features)
         # print(input.shape)
         h0 = torch.zeros(self.num_layers*2, input.size(0), self.hidden_size).to(device) # 2 for bidirection
         c0 = torch.zeros(self.num_layers*2, input.size(0), self.hidden_size).to(device)
         # print(h0.shape)
 
         # Forward propagate GRU
-        out, _ = self.gru(input, (h0, c0))  # out: tensor of shape (batch_size, seq_length, hidden_size*2)
+        out, _ = self.rnn(input, (h0, c0))  # out: tensor of shape (batch_size, seq_length, hidden_size*2)
 
         # Decode the hidden state of the last time step
         out = self.fc(out[-1, :, :])
         return out
+
 
 class EncoderRNN(nn.Module):
     def __init__(self, input_size, hidden_size, n_layers=1, dropout=0.1):
