@@ -15,10 +15,10 @@ class Net(nn.Module):
         self.output_size = output_dim
         self.n_layers = n_layers
 
-        self.encoder = nn.Embedding(self.input_size, self.embedding_size)  # input size, hidden1 size        
+        self.encoder = nn.Embedding(self.input_size, self.embedding_size)  # input size, hidden1 size
         # print(self.encoder.weight)
         # nn.init.xavier_uniform_(self.encoder.weight, gain=5/3)
-        
+
         if rnn_model == 'LSTM':
             # set batch_first=true,  input/output tensors are provided as (batch, seq, feature)
             self.rnn = nn.LSTM(input_size=self.embedding_size, hidden_size=self.hidden_size, num_layers=self.n_layers,
@@ -28,7 +28,7 @@ class Net(nn.Module):
                                 dropout=dropout, batch_first=True, bidirectional=False)
         else:
             raise LookupError('Currently only support LSTM and GRU, or trying self-defined RNN-cell')
-        
+
         # for name, param in self.lstm.named_parameters():
         #     if 'bias' in name:
         #         nn.init.constant_(param, 0.0)
@@ -41,23 +41,20 @@ class Net(nn.Module):
 
     def forward(self, input):
         # print('forwarding~~~')
-        input = torch.unsqueeze(input, 0)
-        # print(input.shape)
-        # print(input.t().shape)
         input = self.encoder(input.t()) # LSTM takes 3D inputs (timesteps, batch, features)
-        # encoder = F.relu(encoder)          #                    = (seq_length, batch_size, embedding_dim)
+                                        #   = (seq_length, batch_size, embedding_dim)
         # print(input.shape)
         # pass hidden param help speed up training
         rnn_out, _ = self.rnn(input)      # Each timestep outputs 1 hidden_state
-        # rnn_out = F.relu(rnn_out)              # Combined in lstm_out = (seq_length, batch_size, hidden_dim) 
+                                          # Combined in lstm_out = (seq_length, batch_size, hidden_dim)
         # print(rnn_out.shape)
-        # ht = rnn_out[-1]                        # ht = last hidden state = (batch_size, hidden_dim)
-                                                 # Use the last hidden state to predict the following character        
+        # ht = rnn_out[-1]                # ht = last hidden state = (batch_size, hidden_dim)
+                                          # Use the last hidden state to predict the following character
         # print(ht.shape)
-        out = self.decoder(rnn_out[-1, :, :])                # Fully-connected layer, predict (batch_size, input_dim)
+        out = self.decoder(rnn_out[-1, :, :])   # Fully-connected layer, predict (batch_size, input_dim)
         # print(out.shape)
         return out
-    
+
 
 
 # Bidirectional recurrent neural network (many-to-many)
@@ -69,20 +66,17 @@ class BiRNN(nn.Module):
         self.encoder = nn.Embedding(input_size, embedding_dim)
         self.lstm = nn.LSTM(embedding_dim, self.hidden_size, num_layers=self.num_layers, batch_first=True, bidirectional=True, dropout=dropout)
         self.fc = nn.Linear(hidden_size*2, output_size)  # 2 for bidirection
-    
+
     def forward(self, input):
         # Set initial states
-        input = torch.unsqueeze(input, 0)
-        
-        # print(input.t().shape)
         input = self.encoder(input.t()) # LSTM takes 3D inputs (timesteps, batch, features)
         # print(input.shape)
-        h0 = torch.zeros(self.num_layers*2, input.size(0), self.hidden_size) # 2 for bidirection 
-        c0 = torch.zeros(self.num_layers*2, input.size(0), self.hidden_size)        
+        h0 = torch.zeros(self.num_layers*2, input.size(0), self.hidden_size) # 2 for bidirection
+        c0 = torch.zeros(self.num_layers*2, input.size(0), self.hidden_size)
         # print(h0.shape)
         # Forward propagate LSTM
         out, _ = self.lstm(input, (h0, c0))  # out: tensor of shape (batch_size, seq_length, hidden_size*2)
-        
+
         # Decode the hidden state of the last time step
         out = self.fc(out[-1, :, :])
         return out

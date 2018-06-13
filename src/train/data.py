@@ -5,7 +5,7 @@ import os
 import re
 
 
-def parse_corpus(path, mode, seq_length=50):
+def parse_corpus(path, mode, batch_size, seq_length=50):
     '''
         Parse raw corpus text into input-output pairs
           input: sequence of words,
@@ -62,7 +62,25 @@ def parse_corpus(path, mode, seq_length=50):
     print(len(word_list), len(words))
     # print(len(dataX), len(dataX[0]))
     # print(len(dataY), dataY[0])
-    return (dataX, dataY, word_to_int, int_to_word, words)
+
+    # For simplicity, discard trailing data not fitting into batch_size
+    n_patterns = len(dataY)
+    n_patterns = n_patterns - n_patterns % batch_size
+    X = dataX[:n_patterns]
+    Y = dataY[:n_patterns]
+
+    # Parse X
+    X = np.array(X)
+    _, seq_length = X.shape
+    X = X.reshape(-1, batch_size, seq_length)
+    X = torch.LongTensor(X)
+
+    # Parse Y
+    Y = np.array(Y)
+    Y = Y.reshape(-1, batch_size)
+    Y = torch.LongTensor(Y)
+
+    return (list(zip(X, Y)), dataX, dataY, word_to_int, int_to_word, words)
 
 
 

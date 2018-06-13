@@ -11,9 +11,9 @@ from .data import parse_corpus#, format_data
 from .model import Net, BiRNN
 
 def load_data(path, seq_length, batch_size, mode):
-    dataX, dataY, target_to_int, int_to_target, targets = parse_corpus(path, mode, seq_length=seq_length)
+    data, dataX, dataY, target_to_int, int_to_target, targets = parse_corpus(path, mode, batch_size, seq_length=seq_length)
     # data = format_data(dataX, dataY, n_classes=len(targets), batch_size=batch_size)
-    return dataX, dataY, target_to_int, int_to_target, targets
+    return data, dataX, dataY, target_to_int, int_to_target, targets
 
 def save_pickle(data, path):
     with open(path, 'wb') as f:
@@ -24,38 +24,35 @@ def load_pickle(path):
         data = pickle.load(f)
     return data
 
-def train(data, batch_size, log_interval):            
+def train(data, log_interval):
     model.train()   # for Dropout & BatchNorm
     # model.zero_grad() # set this or optimizer to zero
     loss = 0
     counter = 0
-
-    '''
-    # truncated to the last K timesteps (for gradient vanishing)
-    for t in range(T):
-        out = model(out)
-        if T - t == K:
-            out.backward()
-            out.detach()
-    out.backward()
-
-    # or
-
-    modelparameter.requires_grad = False
-    for t in range(T):
-        out = model(out)
-        if T - t == K:
-            modelparameter.requires_grad = True
-    out.backward()
-    '''
-    
-    for ind, (seq_in, target) in enumerate(data):
-        # print(seq_in,target)        
-        seq_in, target = Variable(torch.LongTensor(seq_in)), Variable(torch.LongTensor([target]))        
-        optimizer.zero_grad()        
+    for batch_i, (seq_in, target) in enumerate(data):
+        seq_in, target = Variable(seq_in), Variable(target)
+        optimizer.zero_grad()
 
         output = model(seq_in)
-        # print(output.shape, target.shape)        
+        loss = F.cross_entropy(output, target)
+        # print(output.size())
+        # print(output)
+        # print(target.size())
+        # print(target)
+        loss.backward()
+        optimizer.step()
+
+        # Log training status
+        if batch_i % log_interval == 0:
+            print('Train epoch: {} ({:2.0f}%)\tLoss: {:.6f}'.format(epoch, 100. * batch_i / len(data), loss.data.item()))
+    '''
+    for ind, (seq_in, target) in enumerate(data):
+        # print(seq_in,target)
+        seq_in, target = Variable(torch.LongTensor(seq_in)), Variable(torch.LongTensor([target]))
+        optimizer.zero_grad()
+
+        output = model(seq_in)
+        # print(output.shape, target.shape)
         loss += F.cross_entropy(output, target)
         counter +=1
 
@@ -67,7 +64,7 @@ def train(data, batch_size, log_interval):
                         .format(epoch, 100. * ind / len(data), loss.data.item()/counter))
             counter = 0
             loss = 0
-
+    '''
 if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser(description='Train seq2seq model')
@@ -96,7 +93,7 @@ if __name__ == '__main__':
     parser.add_argument('--save-interval', type=int, default=10, metavar='N',
                         help='number of epochs to wait before saving model (default: 10)')
     parser.add_argument('--mode', type=str, default='char', metavar='N',
-                        help='char/word level to train model (default: char)')                        
+                        help='char/word level to train model (default: char)')
     parser.add_argument('--output', type=str, default='model.bin', metavar='F',
                         help='output model file')
     parser.add_argument('--output-c', type=str, default='corpus.bin', metavar='F',
@@ -118,9 +115,9 @@ if __name__ == '__main__':
             model = torch.load(args.modelbin)
         else:
             print("Re-train the model ...")
-            dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus, 
-                                                                            seq_length=args.seq_length, 
-                                                                            batch_size=args.batch_size, 
+            train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus,
+                                                                            seq_length=args.seq_length,
+                                                                            batch_size=args.batch_size,
                                                                             mode=args.mode)
             # model = Net(len(targets), args.embedding_dim, args.hidden_dim, len(targets),
             #             n_layers=2,
@@ -130,7 +127,7 @@ if __name__ == '__main__':
                             dropout=args.dropout)
     else:
         print("Train a new model ...")
-        dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus,
+        train_data, dataX, dataY, target_to_int, int_to_target, targets = load_data(args.corpus,
                                                                         seq_length=args.seq_length,
                                                                         batch_size=args.batch_size,
                                                                         mode=args.mode)
@@ -148,9 +145,8 @@ if __name__ == '__main__':
     try:
         for epoch in range(args.epochs):
             # shuffle(train_data)
-            train_data = list(zip(dataX, dataY))
             shuffle(train_data)
-            train(train_data, batch_size=args.batch_size, log_interval=args.log_interval)
+            train(train_data, log_interval=args.log_interval)
 
             if (epoch + 1) % args.save_interval == 0:
                 model.eval()
