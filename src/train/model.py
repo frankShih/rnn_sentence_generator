@@ -141,17 +141,19 @@ class Attn(nn.Module):
                 attn_energies[b, i] = self.score(hidden[:, b], encoder_outputs[i, b].unsqueeze(0))
 
         # Normalize energies to weights in range 0 to 1, resize to 1 x B x S
-        return F.softmax(attn_energies).unsqueeze(1)
+        # softmax on timestamp dim
+        return F.softmax(attn_energies, dim=1).unsqueeze(1)
 
     def score(self, hidden, encoder_output):
         if self.method == 'dot':
-            energy = hidden.dot(encoder_output)
+            energy = hidden.mm(encoder_output.t())
         elif self.method == 'general':
             energy = self.attn(encoder_output)
-            energy = hidden.dot(energy)
+            # print(hidden.size(), energy.size())
+            energy = hidden.mm(energy.t())
         elif self.method == 'concat':
             energy = self.attn(torch.cat((hidden, encoder_output), 1))
-            energy = self.v.dot(energy)
+            energy = self.v.mm(energy.t())
         else:
             print("undefined scoring strategy!!!")
             return
