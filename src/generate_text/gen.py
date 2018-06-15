@@ -1,39 +1,38 @@
 import argparse
-import pickle
+import copy
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from torch.autograd import Variable
+from train.dataUtil import load_pickle
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+tokens = ['<SOS>', '<EOS>', '<PAD>', '<UNK>']
 
-def load_pickle(path):
-    with open(path, 'rb') as f:
-        data = pickle.load(f)
-    return data
 
 def is_end(c):
-    end_tokens = ['。', '？', '！', '.', '?', '!', '』', '」',')', '）']
+    end_tokens = ['。', '？', '！', '.', '?', '!', '』', '」', ')', '）']
     return c in end_tokens
+
 
 def to_prob(vec):
     s = sum(vec)
     return [v / s for v in vec]
 
-def gen_text(model, patterns, target_to_int, int_to_target, targets, temperature=0.8, n_sent=10, restart_seq=False):
+
+def gen_text(model, trainData, target_to_int, int_to_target, targets, temperature=0.8, n_sent=10, restart_seq=False):
+    patterns = copy.deepcopy(trainData)  # for list pass by reference issue
     n_patterns = len(patterns)
 
     # Randomly choose a pattern to start text generation
-    start = np.random.randint(0, n_patterns - 1)
-    pattern = patterns[start]
-
+    current_seq = patterns[np.random.randint(0, n_patterns - 1)]
+    # print(start, end='')
     # Start generation until n_sent sentences generated
     cnt = 0
     while cnt < n_sent:
         # Format input pattern
-        seq_in = np.array(pattern)
-        seq_in = seq_in.reshape(1, -1) # batch_size = 1
+        seq_in = np.array(current_seq)
+        seq_in = seq_in.reshape(1, -1)  # batch_size = 1
         seq_in = Variable(torch.LongTensor(seq_in)).to(device)
         # Predict next target
         pred = model(seq_in)
@@ -46,22 +45,23 @@ def gen_text(model, patterns, target_to_int, int_to_target, targets, temperature
         top_i = torch.multinomial(pred, 1)[0]
         target = targets[top_i]
         target_idx = target_to_int[target]
-        print(target, end='')
+        if target not in tokens:
+            print(target, end='')
 
         # Append predicted character to pattern, truncate to usual pattern size, use as new pattern
-        pattern.append(target_idx)
-        pattern = pattern[1:]
+        current_seq.append(target_idx)
+        current_seq = current_seq[1:]
 
-        if is_end(target):
+        if target == '<EOS>':
             if restart_seq:
-                start = np.random.randint(0, n_patterns - 1)
-                pattern = patterns[start]
+                current_seq = patterns[np.random.randint(0, n_patterns - 1)]
                 print()
 
             cnt += 1
 
     if not restart_seq:
         print()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate text')

@@ -5,14 +5,38 @@ import os
 import re
 import random
 from torch.autograd import Variable
+import pickle
 
 
-def parse_corpus(path, mode, batch_size, seq_length=50):
-    '''
+def load_pickle(path):
+    with open(path, 'rb') as f:
+        data = pickle.load(f)
+    return data
+
+
+def load_data(path, seq_length, batch_size, mode):
+    dataX, dataY, target_to_int, int_to_target, targets = parse_corpus(path, mode, seq_length=seq_length)
+    data = format_data(dataX, dataY, batch_size=batch_size)
+    return data, dataX, dataY, target_to_int, int_to_target, targets
+
+
+def save_pickle(data, path):
+    with open(path, 'wb') as f:
+        pickle.dump(data, f)
+
+
+def load_pickle(path):
+    with open(path, 'rb') as f:
+        data = pickle.load(f)
+    return data
+
+
+def parse_corpus(path, mode, seq_length=50):
+    """
         Parse raw corpus text into input-output pairs
           input: sequence of words,
           output: 1 word after input sequence
-    '''
+    """
 
     rm = re.compile(r"\s+", re.MULTILINE)
 
@@ -21,13 +45,13 @@ def parse_corpus(path, mode, batch_size, seq_length=50):
     if os.path.isdir(path):
         print("loading from path...")
         for filename in os.listdir(path):
-            print(path+filename)
+            print(path + filename)
             if os.path.isdir(os.path.join(path, filename)): continue
             with open(os.path.join(path, filename), encoding='UTF-8', mode='r') as f:
-                 temp = rm.sub("", f.read())
-                 temp = re.sub(r"[『“]", r"「", temp)
-                 temp = re.sub(r"[』”]", r"」", temp)
-                 raw_text += temp
+                temp = rm.sub("", f.read())
+                temp = re.sub(r"[『“]", r"「", temp)
+                temp = re.sub(r"[』”]", r"」", temp)
+                raw_text += temp
     elif os.path.isfile(path):
         print("loading from file...")
         with open(path, encoding='UTF-8', mode='r') as f:
@@ -36,58 +60,45 @@ def parse_corpus(path, mode, batch_size, seq_length=50):
             temp = re.sub(r"[』”]", r"」", temp)
             raw_text += temp
     else:
-        print("Invalid file path. Exiting..." )
+        print("Invalid file path. Exiting...")
         os._exit(1)
 
-    # for i in cut_sentence_new(raw_text):
-    #     print(i)
+    word_list = []
     if mode == 'char':
-        word_list = list(raw_text)
+        for sent in cut_sentence_new(raw_text):
+            temp = ['<SOS>'] + list(sent) + ['<EOS>']
+            word_list.extend(temp)
     elif mode == 'word':
-        word_list = [w for w in jieba.cut(raw_text, cut_all=False)]
+        for sent in cut_sentence_new(raw_text):
+            temp = ['<SOS>'] + [w for w in jieba.cut(sent, cut_all=False)] + ['<EOS>']
+            word_list.extend(temp)
     else:
-        print('Non-supported mode for data preprocessing. Exiting...')
+        print('Non-supported mode for data pre-processing. Exiting...')
         os._exit(1)
 
     # Get unique characters
-    words = list(set(word_list))
-
-    # Map char to int / int to char
-    # word_to_int = {'SOS': 0, 'EOS': 1, 'PAD': 2, 'UNK': 3}
-    # int_to_word = {0: 'SOS', 1: 'EOS', 2: 'PAD', 3: 'UNK'}
+    words = ['<SOS>', '<EOS>', '<PAD>', '<UNK>']
+    words.extend(word_list)
+    words = list(set(words))
+    print(len(word_list), len(words))
+    # print(words)
     word_to_int = dict((c, i) for i, c in enumerate(words))
     int_to_word = dict((i, c) for i, c in enumerate(words))
 
     # Prepare training data, every <seq_length> sequence, predict 1 char after it
-    dataX = [] # N x seq_length
-    dataY = [] # N x 1
+    dataX = []  # N x seq_length
+    dataY = []  # N x 1
     for i in range(0, len(word_list) - seq_length):
         seq_in = word_list[i:i + seq_length]
         seq_out = word_list[i + seq_length]
         dataX.append([word_to_int[w] for w in seq_in])
         dataY.append(word_to_int[seq_out])
-    print(len(word_list), len(words))
 
-    # For simplicity, discard trailing data not fitting into batch_size
-    n_patterns = len(dataY)
-    n_patterns = n_patterns - n_patterns % batch_size
-    X = dataX[:n_patterns]
-    Y = dataY[:n_patterns]
+    return dataX, dataY, word_to_int, int_to_word, words
 
-    X = np.array(X)
-    _, seq_length = X.shape
-    X = X.reshape(-1, batch_size, seq_length)
-    X = torch.LongTensor(X)
 
-    Y = np.array(Y)
-    Y = Y.reshape(-1, batch_size)
-    Y = torch.LongTensor(Y)
-
-    return (list(zip(X, Y)), dataX, dataY, word_to_int, int_to_word, words)
-
-def format_data(dataX, dataY, n_classes, batch_size=64):
-    '''Parse into minibatches, return Tensors'''
-
+def format_data(dataX, dataY, batch_size=64):
+    """Parse into mini-batches, return Tensors"""
     # For simplicity, discard trailing data not fitting into batch_size
     n_patterns = len(dataY)
     n_patterns = n_patterns - n_patterns % batch_size
@@ -98,25 +109,27 @@ def format_data(dataX, dataY, n_classes, batch_size=64):
     X = np.array(X)
     _, seq_length = X.shape
     X = X.reshape(-1, batch_size, seq_length)
-
     X = torch.LongTensor(X)
 
     # Parse Y
     Y = np.array(Y)
     Y = Y.reshape(-1, batch_size)
-
     Y = torch.LongTensor(Y)
 
     return list(zip(X, Y))
 
+
 def is_chinese(uchar):
-    return uchar >= u'/u4e00' and uchar<=u'/u9fa5'
+    return uchar >= u'/u4e00' and uchar <= u'/u9fa5'
+
 
 def is_number(uchar):
-    return uchar >= u'/u0030' and uchar<=u'/u0039'
+    return uchar >= u'/u0030' and uchar <= u'/u0039'
+
 
 def is_alphabet(uchar):
-    return (uchar >= u'/u0041' and uchar<=u'/u005a') or (uchar >= u'/u0061' and uchar<=u'/u007a')
+    return (uchar >= u'/u0041' and uchar <= u'/u005a') or (uchar >= u'/u0061' and uchar <= u'/u007a')
+
 
 def cut_sentence_new(words):
     # words = (words).decode('utf8')
@@ -127,25 +140,26 @@ def cut_sentence_new(words):
     punt_list = '.!?:;~。！？：；～』”」'
     closure_list = "「“『』”」"
     for word in words:
-        if word in closure_list:    closure_flag = not(closure_flag)
-        if word in punt_list and token not in punt_list and not(closure_flag):
-            #check if next word is puncuation or not
-            sents.append(words[start:i+1])
-            start = i+1
+        if word in closure_list:    closure_flag = not (closure_flag)
+        if word in punt_list and token not in punt_list and not (closure_flag):
+            # check if next word is punctuation or not
+            sents.append(words[start:i + 1])
+            start = i + 1
             i += 1
         else:
             i += 1
-            token = list(words[start:i+2]).pop()
+            token = list(words[start:i + 2]).pop()
             # get next word
     if start < len(words):
         sents.append(words[start:])
     return sents
 
 
+'''
 from torch import optim
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence#, masked_cross_entropy
-from masked_cross_entropy import *
+import masked_cross_entropy #import *
 import time
 import math
 import matplotlib.pyplot as plt
@@ -163,6 +177,7 @@ SOS_token = 1
 EOS_token = 2
 UNK_token = 3
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 class Lang:
     def __init__(self):
         # self.trimmed = False
@@ -230,7 +245,7 @@ class Lang:
         print("Trimmed from %d pairs to %d, %.4f of total" % (len(pairs), len(keep_pairs), len(keep_pairs) / len(pairs)))
         return keep_pairs
 
-    '''
+    
     # Turn a Unicode string to plain ASCII, thanks to http://stackoverflow.com/a/518232/2809427
     def unicode_to_ascii(self, s):
         return ''.join(
@@ -245,7 +260,7 @@ class Lang:
         s = re.sub(r"[^a-zA-Z,.!?]+", r" ", s)
         s = re.sub(r"\s+", r" ", s).strip()
         return s
-    '''
+    
     def read_langs(self, path, mode):
         rm = re.compile(r"\s+", re.MULTILINE)
 
@@ -312,7 +327,7 @@ class Lang:
         return filtered_pairs
 
 
-    def prepare_data(self, path, mode='char'):
+    def prepare_data(self, path, mode='word'):
         output_lang, pairs = self.read_langs(path, mode)
         print("Read %d sentence pairs" % len(pairs))
 
@@ -323,7 +338,7 @@ class Lang:
         return output_lang, pairs
 
     # Return a list of indexes, one for each word in the sentence, plus EOS
-    def indexes_from_sentence(self, sentence, mode='char'):
+    def indexes_from_sentence(self, sentence, mode='word'):
         if mode == 'char':
             return [self.word2index[word] for word in sentence] + [EOS_token]
         elif mode == 'word':
@@ -338,7 +353,7 @@ class Lang:
         seq += [PAD_token for i in range(max_length - len(seq))]
         return seq
 
-    def random_batch(self, pairs, batch_size=5, mode='char'):
+    def random_batch(self, pairs, batch_size=5, mode='word'):
         input_seqs = []
         target_seqs = []
 
@@ -392,7 +407,7 @@ def train(input_batches, input_lengths, target_batches, target_lengths, encoder,
         decoder_input = target_batches[t] # Next input is current target
 
     # Loss calculation and backpropagation
-    loss = masked_cross_entropy(
+    loss = masked_cross_entropy.masked_cross_entropy(
         all_decoder_outputs.transpose(0, 1).contiguous(), # -> batch x seq
         target_batches.transpose(0, 1).contiguous(), # -> batch x seq
         target_lengths
@@ -400,14 +415,14 @@ def train(input_batches, input_lengths, target_batches, target_lengths, encoder,
     loss.backward()
 
     # Clip gradient norms
-    ec = torch.nn.utils.clip_grad_norm(encoder.parameters(), clip)
-    dc = torch.nn.utils.clip_grad_norm(decoder.parameters(), clip)
+    ec = torch.nn.utils.clip_grad_norm_(encoder.parameters(), clip)
+    dc = torch.nn.utils.clip_grad_norm_(decoder.parameters(), clip)
 
     # Update parameters with optimizers
     encoder_optimizer.step()
     decoder_optimizer.step()
 
-    return loss.data[0], ec, dc
+    return loss.data.item(), ec, dc
 
 def as_minutes(s):
     m = math.floor(s / 60)
@@ -424,13 +439,14 @@ def time_since(since, percent):
 def evaluate(lang, input_seq, max_length=MAX_LENGTH):
     input_lengths = [len(input_seq)]
     input_seqs = [lang.indexes_from_sentence(input_seq, mode='word')]
-    input_batches = Variable(torch.LongTensor(input_seqs), volatile=True).transpose(0, 1).to(device)
+    input_batches = Variable(torch.LongTensor(input_seqs), requires_grad=False).transpose(0, 1).to(device)
 
     # Set to not-training mode to disable dropout
     encoder.train(False)
     decoder.train(False)
 
     # Run through encoder
+
     encoder_outputs, encoder_hidden = encoder(input_batches, input_lengths, None)
 
     # Create starting vectors for decoder
@@ -464,12 +480,12 @@ def evaluate(lang, input_seq, max_length=MAX_LENGTH):
 
     return decoded_words, decoder_attentions[:di+1, :len(encoder_outputs)]
 
-def evaluate_randomly():
+def evaluate_randomly(lang):
     [input_sentence, target_sentence] = random.choice(pairs)
-    evaluate_and_show_attention(input_sentence, target_sentence)
+    evaluate_and_show_attention(lang, input_sentence, target_sentence)
 
-def evaluate_and_show_attention(input_sentence, target_sentence=None):
-    output_words, attentions = evaluate(input_sentence)
+def evaluate_and_show_attention(lang, input_sentence, target_sentence=None):
+    output_words, attentions = evaluate(lang, input_sentence)
     output_sentence = ' '.join(output_words)
     print('>', input_sentence)
     if target_sentence is not None:
@@ -486,8 +502,9 @@ def evaluate_and_show_attention(input_sentence, target_sentence=None):
 
 if __name__ == '__main__':
     lang = Lang()
-    lang, pairs = lang.prepare_data(path="C:\\Users\\han_shih.ASUS\\Documents\\story\\testing\\001.txt", mode='word')
+    # lang, pairs = lang.prepare_data(path="C:\\Users\\han_shih.ASUS\\Documents\\story\\testing\\001.txt", mode='word')
     # lang.trim(pairs, min_count=2)
+    
     small_batch_size = 3
     input_batches, input_lengths, target_batches, target_lengths = lang.random_batch(pairs, batch_size=small_batch_size, mode='word')
     print('input_batches', input_batches.size()) # (max_len x batch_size)
@@ -519,32 +536,32 @@ if __name__ == '__main__':
         decoder_input = target_batches[t] # Next input is current target
 
     # Test masked cross entropy loss
-    loss = masked_cross_entropy(
+    loss = masked_cross_entropy.masked_cross_entropy(
         all_decoder_outputs.transpose(0, 1).contiguous(),
         target_batches.transpose(0, 1).contiguous(),
         target_lengths
     )
     print('loss', loss.data.item())
-
+    
 
     # Configure models
     attn_model = 'dot'
-    hidden_size = 500
+    hidden_size = 10
     n_layers = 2
     dropout = 0.1
     # batch_size = 100
-    batch_size = 50
+    batch_size = 1
 
     # Configure training/optimization
     clip = 50.0
     teacher_forcing_ratio = 0.5
-    learning_rate = 0.0001
+    learning_rate = 0.001
     decoder_learning_ratio = 5.0
-    n_epochs = 50000
+    n_epochs = 500
     epoch = 0
     plot_every = 20
-    print_every = 100
-    evaluate_every = 1000
+    print_every = 1
+    evaluate_every = 5
 
     # Initialize models
     encoder = model.EncoderRNN(lang.n_words, hidden_size, n_layers, dropout=dropout).to(device)
@@ -581,6 +598,7 @@ if __name__ == '__main__':
     eca = 0
     dca = 0
 
+    
     while epoch < n_epochs:
         epoch += 1
 
@@ -600,7 +618,7 @@ if __name__ == '__main__':
         eca += ec
         dca += dc
 
-        job.record(epoch, loss)
+        # job.record(epoch, loss)
 
         if epoch % print_every == 0:
             print_loss_avg = print_loss_total / print_every
@@ -609,7 +627,7 @@ if __name__ == '__main__':
             print(print_summary)
 
         if epoch % evaluate_every == 0:
-            evaluate_randomly()
+            evaluate_randomly(lang)
 
         # if epoch % plot_every == 0:
         #     plot_loss_avg = plot_loss_total / plot_every
@@ -625,3 +643,4 @@ if __name__ == '__main__':
         #     vis.line(np.array(dcs), win=dcs_win, opts={'title': dcs_win})
         #     eca = 0
         #     dca = 0
+    '''
