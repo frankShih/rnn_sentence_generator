@@ -34,9 +34,9 @@ class Lang:
         self.index2word = {0: '<SOS>', 1: '<EOS>', 2: '<PAD>', 3: '<UNK>'}
         self.n_words = 4 # Count default tokens
 
-    def index_words(self, sentence):
-        for word in sentence.split(' '):
-            self.index_word(word)
+    # def index_words(self, sentence):
+    #     for word in sentence.split(' '):
+    #         self.index_word(word)
 
     def index_word(self, word):
         if word not in self.word2index:
