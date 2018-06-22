@@ -20,9 +20,9 @@ from dataUtil import *
 MIN_LENGTH = 3
 MAX_LENGTH = 25
 
-PAD_token = 0
-SOS_token = 1
-EOS_token = 2
+SOS_token = 0
+EOS_token = 1
+PAD_token = 2
 UNK_token = 3
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -241,7 +241,7 @@ def train(input_batches, input_lengths, target_batches, target_lengths, encoder,
     # Prepare input and output variables
     decoder_input = Variable(torch.LongTensor([SOS_token] * batch_size)).to(device)
     decoder_hidden = encoder_hidden[:decoder.n_layers] # Use last (forward) hidden state from encoder
-
+    # print(encoder_hidden.shape, decoder_hidden.shape)
     max_target_length = max(target_lengths)
     all_decoder_outputs = Variable(torch.zeros(max_target_length, batch_size, decoder.output_size)).to(device)
 
@@ -296,7 +296,7 @@ def evaluate(lang, input_seq, max_length=MAX_LENGTH):
     # Run through encoder
 
     encoder_outputs, encoder_hidden = encoder(input_batches, input_lengths, None)
-
+    print("evaluating", input_batches.shape, input_lengths, encoder_outputs.shape, encoder_hidden.shape)
     # Create starting vectors for decoder
     decoder_input = Variable(torch.LongTensor([SOS_token]), volatile=True).to(device) # SOS
     decoder_hidden = encoder_hidden[:decoder.n_layers] # Use last (forward) hidden state from encoder
@@ -353,13 +353,13 @@ if __name__ == '__main__':
     lang, pairs = lang.prepare_data(path="C:\\Users\\han_shih.ASUS\\Documents\\story\\testing\\001.txt", mode='word')
     # lang.trim(pairs, min_count=2)
 
-    small_batch_size = 3
+    small_batch_size = 1
     input_batches, input_lengths, target_batches, target_lengths = lang.random_batch(pairs, batch_size=small_batch_size, mode='word')
     print('input_batches', input_batches.size()) # (max_len x batch_size)
     print('target_batches', target_batches.size()) # (max_len x batch_size)
     small_hidden_size = 8
     small_n_layers = 2
-
+    print(lang.n_words, small_hidden_size)
     encoder_test = model.EncoderRNN(lang.n_words, small_hidden_size, small_n_layers).to(device)
     decoder_test = model.LuongAttnDecoderRNN('general', small_hidden_size, lang.n_words, small_n_layers).to(device)
 
@@ -377,6 +377,7 @@ if __name__ == '__main__':
 
     # Run through decoder one time step at a time
     for t in range(max_target_length):
+        print('decoder_hidden', decoder_hidden.size())
         decoder_output, decoder_hidden, decoder_attn = decoder_test(
             decoder_input, decoder_hidden, encoder_outputs
         )
@@ -398,7 +399,7 @@ if __name__ == '__main__':
     n_layers = 2
     dropout = 0.1
     # batch_size = 100
-    batch_size = 1
+    batch_size = 5
 
     # Configure training/optimization
     clip = 50.0

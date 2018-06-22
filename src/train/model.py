@@ -94,13 +94,11 @@ class BiRNN(nn.Module):
 class EncoderRNN(nn.Module):
     def __init__(self, input_size, hidden_size, n_layers=1, dropout=0.1):
         super(EncoderRNN, self).__init__()
-        self.input_size = input_size
         self.hidden_size = hidden_size
         self.n_layers = n_layers
-        self.dropout = dropout
 
         self.embedding = nn.Embedding(input_size, hidden_size)
-        self.gru = nn.GRU(hidden_size, hidden_size, n_layers, dropout=self.dropout, bidirectional=True)
+        self.gru = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, bidirectional=True)
 
     def forward(self, input_seqs, input_lengths, hidden=None):
         # if not hidden:
@@ -108,11 +106,11 @@ class EncoderRNN(nn.Module):
         #     hidden = nn.Parameter(torch.zeros(1, input_seqs.size()[1], self.hidden_size), requires_grad=True)
         # Note: we run this all at once (over multiple batches of multiple sequences)
         print("forwarding ~~~")
-        # print(input_seqs.size())
+        # print(input_seqs)
         embedded = self.embedding(input_seqs)
         print(embedded.size(), input_lengths)
         packed = torch.nn.utils.rnn.pack_padded_sequence(embedded, input_lengths)
-        print(packed, hidden)
+        # print(packed, hidden)
         # for name, param in self.named_parameters():
         #     # if param.requires_grad:
         #     print(name, param.data.size())
@@ -232,13 +230,14 @@ class LuongAttnDecoderRNN(nn.Module):
 
     def forward(self, input_seq, last_hidden, encoder_outputs):
         # Note: we run this one step at a time
-
+        # print("for decoder",input_seq.shape, last_hidden.shape, encoder_outputs.shape)
         # Get the embedding of the current input word (last output word)
         batch_size = input_seq.size(0)
+
         embedded = self.embedding(input_seq)
         embedded = self.embedding_dropout(embedded)
         embedded = embedded.view(1, batch_size, self.hidden_size)  # S=1 x B x N
-
+        # print("for decoder",embedded.shape, batch_size)
         # Get current hidden state from input word and last hidden state
         rnn_output, hidden = self.gru(embedded, last_hidden)
 
