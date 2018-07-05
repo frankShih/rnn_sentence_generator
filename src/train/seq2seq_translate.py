@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*
+
 from __future__ import unicode_literals, print_function, division
 from io import open
 import unicodedata
@@ -149,19 +151,19 @@ class EncoderRNN(nn.Module):
         self.gru = nn.GRU(hidden_size, hidden_size, n_layers, dropout=dropout, bidirectional=True)
 
     def forward(self, input_seqs, input_lengths, hidden=None):
-#         print(input)
-#         embedded = self.embedding(input).view(1, 1, -1)
-#         print(embedded.shape)
-#         output, hidden = self.gru(embedded, hidden)
-#         print(output.shape)
+        #         print(input)
+        #         embedded = self.embedding(input).view(1, 1, -1)
+        #         print(embedded.shape)
+        #         output, hidden = self.gru(embedded, hidden)
+        #         print(output.shape)
 
         embedded = self.embedding(input_seqs)
-#         print(embedded.size(), input_lengths)
+        #         print(embedded.size(), input_lengths)
         packed = torch.nn.utils.rnn.pack_padded_sequence(embedded, input_lengths)
         output, hidden = self.gru(packed, hidden)
         output, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(output)
         output = output[:, :, :self.hidden_size] + output[:, :, self.hidden_size:]  # Sum bidirectional outputs
-#         print(output.shape, hidden.shape)
+        #         print(output.shape, hidden.shape)
         return output, hidden
 
     def initHidden(self):
@@ -332,16 +334,16 @@ class LuongAttnDecoderRNN(nn.Module):
 
     def forward(self, input_seq, last_hidden, encoder_outputs):
         # Note: we run this one step at a time
-#         print("decoder forwarding~~~")
-#         print(input_seq.shape, last_hidden.shape, encoder_outputs.shape)
+        #         print("decoder forwarding~~~")
+        #         print(input_seq.shape, last_hidden.shape, encoder_outputs.shape)
         # Get the embedding of the current input word (last output word)
         batch_size = input_seq.size(0)
         embedded = self.embedding(input_seq)
-#         print(batch_size, embedded.shape)
+        #         print(batch_size, embedded.shape)
         embedded = self.embedding_dropout(embedded)
-#         print(batch_size, embedded.shape)
+        #         print(batch_size, embedded.shape)
         embedded = embedded.view(1, batch_size, self.hidden_size)  # S=1 x B x N
-#         print(batch_size, embedded.shape)
+        #         print(batch_size, embedded.shape)
         # Get current hidden state from input word and last hidden state
         rnn_output, hidden = self.gru(embedded, last_hidden)
 
@@ -368,16 +370,21 @@ class LuongAttnDecoderRNN(nn.Module):
 # Return a list of indexes, one for each word in the sentence, plus EOS
 def indexes_from_sentence(lang, sentence, mode='word'):
     if mode == 'char':
-        return [lang.word2index[word] for word in sentence]
+        temp = [lang.word2index[word] for word in sentence]
+        # temp.append(EOS_token)
+        return temp
     elif mode == 'word':
-        return [lang.word2index[word] for word in jieba.cut(sentence, cut_all=False)]
+        temp = [lang.word2index[word] for word in jieba.cut(sentence, cut_all=False)]
+        temp.append(EOS_token)
+        return
     else:
         print('Non-supported mode for preprocessing! Exiting...')
         os._exit(1)
 
+
 def tensorFromSentence(lang, sentence):
     indexes = indexes_from_sentence(lang, sentence)
-    indexes.append(EOS_token)
+    # indexes.append(EOS_token)
     return torch.tensor(indexes, dtype=torch.long, device=device).view(-1, 1)
 
 
@@ -481,20 +488,7 @@ def train(input_batches, input_lengths, target_batches, target_lengths, encoder,
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
 
-#     input_length = input_tensor.size(0)
-#     target_length = target_tensor.size(0)
-
-#     encoder_outputs = torch.zeros(max_length, encoder.hidden_size, device=device)
-
     loss = 0
-
-#     for ei in range(input_length):
-#         encoder_output, encoder_hidden = encoder(
-#             input_tensor[ei], encoder_hidden)
-#         encoder_outputs[ei] = encoder_output[0, 0]
-#     decoder_input = torch.tensor([[SOS_token]], device=device)
-
-#     decoder_hidden = encoder_hidden[:decoder.n_layers] #use last hidden state from encoder
 
     batch_size = len(input_lengths)
     encoder_outputs, encoder_hidden = encoder(input_batches, input_lengths, encoder_hidden)
@@ -509,12 +503,6 @@ def train(input_batches, input_lengths, target_batches, target_lengths, encoder,
 
     if use_teacher_forcing:
         # Teacher forcing: Feed the target as the next input
-#         for di in range(target_length):
-#             decoder_output, decoder_hidden, decoder_attention = decoder(
-#                 decoder_input, decoder_hidden, encoder_outputs)
-#             loss += criterion(decoder_output, target_tensor[di])
-#             decoder_input = target_tensor[di]  # Teacher forcing
-
         for t in range(max(target_lengths)):
             decoder_output, decoder_hidden, decoder_attn = decoder(
                 decoder_input, decoder_hidden, encoder_outputs
@@ -532,17 +520,6 @@ def train(input_batches, input_lengths, target_batches, target_lengths, encoder,
 
     else:
         # Without teacher forcing: use its own predictions as the next input
-#         for di in range(target_length):
-#             decoder_output, decoder_hidden, decoder_attention = decoder(
-#                 decoder_input, decoder_hidden, encoder_outputs)
-#             topv, topi = decoder_output.topk(1)
-#             decoder_input = topi.squeeze().detach()  # detach from history as input
-
-#             loss += criterion(decoder_output, target_tensor[di])
-#             if decoder_input.item() == EOS_token:
-#                 break
-
-
         for t in range(max(target_lengths)):
 #             print(decoder_hidden.shape)
             decoder_output, decoder_hidden, decoder_attn = decoder(
@@ -643,42 +620,26 @@ def evaluate(encoder, decoder, sentence, max_length=MAX_LENGTH):
     with torch.no_grad():
         input_tensor = tensorFromSentence(output_lang, sentence)
         input_length = input_tensor.size()[0]
+
         encoder_hidden = torch.zeros(2, 1, encoder.hidden_size, device=device)#encoder.initHidden()
-        '''
-
-        decoder_input = Variable(torch.LongTensor([SOS_token] * batch_size)).to(device)
-        decoder_hidden = encoder_hidden[:decoder.n_layers] # Use last (forward) hidden state from encoder
-
-        max_target_length = max(target_lengths)
-        all_decoder_outputs = Variable(torch.zeros(max_target_length, batch_size, decoder.output_size)).to(device)
-
-        use_teacher_forcing = True #if random.random() < teacher_forcing_ratio else False
-
-        for t in range(max(target_lengths)):
-            decoder_output, decoder_hidden, decoder_attn = decoder(
-                decoder_input, decoder_hidden, encoder_outputs
-            )
-
-            all_decoder_outputs[t] = decoder_output
-            decoder_input = target_batches[t] # Next input is current target
-        '''
         encoder_outputs, encoder_hidden = encoder(input_tensor, [input_length], encoder_hidden)
 
         decoder_input = torch.tensor([[SOS_token]], device=device)  # SOS
-
         decoder_hidden = encoder_hidden[:decoder.n_layers]
 
         decoded_words = []
         decoder_attentions = torch.zeros(max_length, max_length)
 
         for di in range(max_length):
-#             decoder_output, decoder_hidden, decoder_attention = decoder(
-#                 decoder_input, decoder_hidden, encoder_outputs)
-#             decoder_attentions[di] = decoder_attention.data
             decoder_output, decoder_hidden, decoder_attention = decoder(decoder_input, decoder_hidden, encoder_outputs)
             decoder_attentions[di,:decoder_attention.size(2)] += decoder_attention.squeeze(0).squeeze(0).cpu().data
-            topv, topi = decoder_output.data.topk(1)
+            # topv, topi = decoder_output.data.topk(1)
+
+            pred = decoder_output.data.view(-1).div(0.8).exp()
+            topi = torch.multinomial(pred, 1)[0]
+
             if topi.item() == EOS_token:
+                print("EOS　is predicted ~~~")
                 decoded_words.append('<EOS>')
                 break
             else:
@@ -701,12 +662,9 @@ def evaluateRandomly(encoder, decoder, n=10):
 
 
 hidden_size = 64
-batch_size = 10
+batch_size = 20
 encoder1 = EncoderRNN(output_lang.n_words, hidden_size, 1, batch_size=batch_size).to(device)
 attn_decoder1 = LuongAttnDecoderRNN('general', hidden_size, output_lang.n_words, 1).to(device)
 
-trainIters(encoder1, attn_decoder1, 500, print_every=50, batch_size=batch_size)
-
-
-
+trainIters(encoder1, attn_decoder1, 1500, print_every=50, batch_size=batch_size)
 evaluateRandomly(encoder1, attn_decoder1, n=5)
