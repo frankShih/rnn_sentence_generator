@@ -8,11 +8,6 @@ from torch.autograd import Variable
 import pickle
 
 
-def load_pickle(path):
-    with open(path, 'rb') as f:
-        data = pickle.load(f)
-    return data
-
 
 def load_data(path, seq_length, batch_size, mode):
     dataX, dataY, target_to_int, int_to_target, targets = parse_corpus(path, mode, seq_length=seq_length)

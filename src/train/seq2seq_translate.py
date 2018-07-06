@@ -17,7 +17,6 @@ import torch.nn.functional as F
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 USE_CUDA = False
 
-
 SOS_token = 0
 EOS_token = 1
 PAD_token = 2
@@ -43,7 +42,6 @@ class Lang:
             self.n_words += 1
         else:
             self.word2count[word] += 1
-
 
 
 def read_langs(path, mode):
@@ -82,7 +80,6 @@ def read_langs(path, mode):
         print('Non-supported mode for training. Exiting...')
         os._exit(1)
 
-
     # Map char to int / int to char
     for word in word_list:
         if word not in lang.word2index:
@@ -99,7 +96,6 @@ def read_langs(path, mode):
     for ind in range(len(sentences)-1):
         pairs.append([sentences[ind], sentences[ind+1]])
     return lang, pairs
-
 
 
 def cut_sentence_new(words):
@@ -126,7 +122,6 @@ def cut_sentence_new(words):
     return sents
 
 
-
 def prepare_data(path, mode='word'):
     output_lang, pairs = read_langs(path, mode)
     print("Read {} sentence pairs, total {} words.".format(len(pairs), output_lang.n_words))
@@ -136,9 +131,6 @@ def prepare_data(path, mode='word'):
     # for p in pairs:
     #     print(p)
     return output_lang, pairs
-
-output_lang, pairs = prepare_data('C:/Users/han_shih.ASUS/Documents/story/testing/', 'word')
-print(random.choice(pairs))
 
 
 class EncoderRNN(nn.Module):
@@ -169,7 +161,6 @@ class EncoderRNN(nn.Module):
     def initHidden(self):
         return torch.zeros(2, self.batch_size, self.hidden_size, device=device)
 
-
 class DecoderRNN(nn.Module):
     def __init__(self, hidden_size, output_size):
         super(DecoderRNN, self).__init__()
@@ -189,7 +180,6 @@ class DecoderRNN(nn.Module):
 
     def initHidden(self):
         return torch.zeros(1, 1, self.hidden_size, device=device)
-
 
 class AttnDecoderRNN(nn.Module):
     def __init__(self, hidden_size, output_size, dropout_p=0.1, max_length=MAX_LENGTH):
@@ -226,7 +216,6 @@ class AttnDecoderRNN(nn.Module):
 
     def initHidden(self):
         return torch.zeros(1, 1, self.hidden_size, device=device)
-
 
 class Attn(nn.Module):
     def __init__(self, method, hidden_size):
@@ -313,7 +302,6 @@ class BahdanauAttnDecoderRNN(nn.Module):
         # Return final output, hidden state, and attention weights (for visualization)
         return output, hidden, attn_weights
 
-
 class LuongAttnDecoderRNN(nn.Module):
     def __init__(self, attn_model, hidden_size, output_size, n_layers=1, dropout=0.1):
         super(LuongAttnDecoderRNN, self).__init__()
@@ -366,31 +354,30 @@ class LuongAttnDecoderRNN(nn.Module):
         return output, hidden, attn_weights
 
 
-
 # Return a list of indexes, one for each word in the sentence, plus EOS
 def indexes_from_sentence(lang, sentence, mode='word'):
     if mode == 'char':
         temp = [lang.word2index[word] for word in sentence]
-        # temp.append(EOS_token)
+        temp.append(EOS_token)
         return temp
     elif mode == 'word':
         temp = [lang.word2index[word] for word in jieba.cut(sentence, cut_all=False)]
         temp.append(EOS_token)
-        return
+        return temp
     else:
         print('Non-supported mode for preprocessing! Exiting...')
         os._exit(1)
 
 
-def tensorFromSentence(lang, sentence):
-    indexes = indexes_from_sentence(lang, sentence)
+def tensorFromSentence(lang, sentence, mode='word'):
+    indexes = indexes_from_sentence(lang, sentence, mode)
     # indexes.append(EOS_token)
     return torch.tensor(indexes, dtype=torch.long, device=device).view(-1, 1)
 
 
-def tensorsFromPair(pair):
-    input_tensor = tensorFromSentence(output_lang, pair[0])
-    target_tensor = tensorFromSentence(output_lang, pair[1])
+def tensorsFromPair(pair, mode='word'):
+    input_tensor = tensorFromSentence(output_lang, pair[0], mode)
+    target_tensor = tensorFromSentence(output_lang, pair[1], mode)
     return (input_tensor, target_tensor)
 
 
@@ -403,8 +390,7 @@ def random_batch(lang, pairs, batch_size=5, mode='word'):
     input_seqs = []
     target_seqs = []
 
-    # Choose random pairs
-    for _ in range(batch_size):
+    for _ in range(batch_size):         # Choose random pairs
         pair = random.choice(pairs)
         input_seqs.append(indexes_from_sentence(lang, pair[0], mode))
         target_seqs.append(indexes_from_sentence(lang, pair[1], mode))
@@ -480,14 +466,10 @@ def masked_cross_entropy(logits, target, length):
     return loss
 
 
-teacher_forcing_ratio = 0.5
-
-
 def train(input_batches, input_lengths, target_batches, target_lengths, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion):
     encoder_hidden = encoder.initHidden()
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
-
     loss = 0
 
     batch_size = len(input_lengths)
@@ -498,7 +480,7 @@ def train(input_batches, input_lengths, target_batches, target_lengths, encoder,
     max_target_length = max(target_lengths)
     all_decoder_outputs = Variable(torch.zeros(max_target_length, batch_size, decoder.output_size)).to(device)
 
-
+    teacher_forcing_ratio = 0.5
     use_teacher_forcing = True #if random.random() < teacher_forcing_ratio else False
 
     if use_teacher_forcing:
@@ -538,16 +520,27 @@ def train(input_batches, input_lengths, target_batches, target_lengths, encoder,
         )
 
     loss.backward()
-
     encoder_optimizer.step()
     decoder_optimizer.step()
 
     return loss.data.item()
 
 
+import pickle
+
+def save_pickle(data, path):
+    with open(path, 'wb') as f:
+        pickle.dump(data, f)
+
+
+def load_pickle(path):
+    with open(path, 'rb') as f:
+        data = pickle.load(f)
+    return data
+
+
 import time
 import math
-
 
 def asMinutes(s):
     m = math.floor(s / 60)
@@ -563,7 +556,7 @@ def timeSince(since, percent):
     return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
 
 
-def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, learning_rate=0.005, batch_size=10):
+def trainIters(encoder, decoder, n_iters, out_e, out_d, print_every=1000, learning_rate=0.005, batch_size=10):
     start = time.time()
     plot_losses = []
     print_loss_total = 0  # Reset every print_every
@@ -571,16 +564,11 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
-#     training_pairs = [tensorsFromPair(random.choice(pairs))
-#                       for i in range(n_iters)]
     criterion = nn.NLLLoss()
 
     for iter in range(1, n_iters + 1):
         input_batches, input_lengths, target_batches, target_lengths \
             = random_batch(output_lang, pairs, batch_size=batch_size, mode='word')
-#         training_pair = training_pairs[iter - 1]
-#         input_tensor = training_pair[0]
-#         target_tensor = training_pair[1]
 
         loss = train(input_batches, input_lengths, target_batches, target_lengths,
                      encoder, decoder, encoder_optimizer, decoder_optimizer, criterion)
@@ -593,27 +581,15 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
             print('%s (%d %d%%) %.4f' % (timeSince(start, iter / n_iters),
                                          iter, iter / n_iters * 100, print_loss_avg))
 
-        if iter % plot_every == 0:
-            plot_loss_avg = plot_loss_total / plot_every
+            save_pickle((output_lang, pairs), args.output_c)
+            encoder.eval()
+            torch.save(encoder, out_e)
+            decoder.eval()
+            torch.save(decoder, out_d)
+
+            plot_loss_avg = plot_loss_total / print_every
             plot_losses.append(plot_loss_avg)
             plot_loss_total = 0
-
-    # showPlot(plot_losses)
-
-
-import matplotlib.pyplot as plt
-plt.switch_backend('agg')
-import matplotlib.ticker as ticker
-import numpy as np
-
-
-def showPlot(points):
-    plt.figure()
-    fig, ax = plt.subplots()
-    # this locator puts ticks at regular intervals
-    loc = ticker.MultipleLocator(base=0.2)
-    ax.yaxis.set_major_locator(loc)
-    plt.plot(points)
 
 
 def evaluate(encoder, decoder, sentence, max_length=MAX_LENGTH):
@@ -639,7 +615,6 @@ def evaluate(encoder, decoder, sentence, max_length=MAX_LENGTH):
             topi = torch.multinomial(pred, 1)[0]
 
             if topi.item() == EOS_token:
-                print("EOS　is predicted ~~~")
                 decoded_words.append('<EOS>')
                 break
             else:
@@ -661,10 +636,74 @@ def evaluateRandomly(encoder, decoder, n=10):
         print('')
 
 
-hidden_size = 64
-batch_size = 20
-encoder1 = EncoderRNN(output_lang.n_words, hidden_size, 1, batch_size=batch_size).to(device)
-attn_decoder1 = LuongAttnDecoderRNN('general', hidden_size, output_lang.n_words, 1).to(device)
 
-trainIters(encoder1, attn_decoder1, 1500, print_every=50, batch_size=batch_size)
-evaluateRandomly(encoder1, attn_decoder1, n=5)
+import argparse
+if __name__ == '__main__':
+    # Parse arguments
+    parser = argparse.ArgumentParser(description='Train seq2seq model')
+    parser.add_argument('--input-c', type=str, default="corpus.bin", metavar='F',
+                        help='corpus bin (default: corpus.bin)')
+    parser.add_argument('--input-e', type=str, default="encoder.bin", metavar='F',
+                        help='model bin (default: encoder.bin)')
+    parser.add_argument('--input-d', type=str, default="decoder.bin", metavar='F',
+                        help='model bin (default: decoder.bin)')
+    parser.add_argument('corpus', type=str, metavar='F',
+                        help='training corpus file')
+    parser.add_argument('--seq-length', type=int, default=50, metavar='N',
+                        help='input sequence length (default: 50)')
+    parser.add_argument('--batch-size', type=int, default=5, metavar='N',
+                        help='training batch size (default: 1)')
+    parser.add_argument('--hidden-dim', type=int, default=16, metavar='N',
+                        help='hidden state dimension (default: 64)')
+    parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
+                        help='learning rate (default: 0.001)')
+    parser.add_argument('--dropout', type=float, default=0.001, metavar='DR',
+                        help='dropout rate (default: 0.2)')
+    parser.add_argument('--epochs', type=int, default=5000, metavar='N',
+                        help='number of epochs to train (default: 50)')
+    parser.add_argument('--log-interval', type=int, default=100, metavar='N',
+                        help='number of batches to wait before logging status (default: 100)')
+    parser.add_argument('--mode', type=str, default='char', metavar='N',
+                        help='char/word level to train model (default: char)')
+    parser.add_argument('--output-e', type=str, default='encoder.bin', metavar='F',
+                        help='output model file')
+    parser.add_argument('--output-d', type=str, default='decoder.bin', metavar='F',
+                        help='output model file')
+    parser.add_argument('--output-c', type=str, default='corpus.bin', metavar='F',
+                        help='output corpus related file (mappings & vocab)')
+    args = parser.parse_args()
+
+    # Load mappings & vocabularies
+    print("####################################################")
+    print("# loading... " + os.path.abspath(args.input_c))
+    print("# loading... " + os.path.abspath(args.input_e))
+    print("# loading... " + os.path.abspath(args.input_d))
+    print("####################################################")
+    print()
+
+    if os.path.exists(args.input_c) and os.path.exists(args.input_e) and os.path.exists(args.input_d):
+        comfirm = input("Train with existing model and corpus? [Y/n]")
+        if comfirm == "y" or comfirm == "Y":
+            output_lang, pairs = load_pickle(args.input_c)
+            encoder = torch.load(args.input_e)
+            attn_decoder = torch.load(args.input_d)
+        else:
+            print("Re-train the model ...")
+            output_lang, pairs = prepare_data(args.corpus, args.mode)
+            encoder = EncoderRNN(output_lang.n_words, args.hidden_dim, 1, batch_size=args.batch_size).to(device)
+            attn_decoder = LuongAttnDecoderRNN('general', args.hidden_dim, output_lang.n_words, 1).to(device)
+
+    else:
+        print("Train a new model ...")
+        output_lang, pairs = prepare_data(args.corpus, args.mode)
+        print(len(output_lang.word2index))
+        encoder = EncoderRNN(output_lang.n_words, args.hidden_dim, 1, batch_size=args.batch_size).to(device)
+        attn_decoder = LuongAttnDecoderRNN('general', args.hidden_dim, output_lang.n_words, 1).to(device)
+
+
+
+    print(random.choice(pairs))
+    trainIters(encoder, attn_decoder, args.epochs, args.output_e, args.output_d, print_every=args.log_interval, learning_rate=args.lr, batch_size=args.batch_size)
+    evaluateRandomly(encoder, attn_decoder, n=5)
+
+
