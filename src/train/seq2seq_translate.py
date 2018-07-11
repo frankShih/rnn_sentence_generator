@@ -134,7 +134,7 @@ def prepare_data(path, mode='word'):
 
 
 class EncoderRNN(nn.Module):
-    def __init__(self, input_size, hidden_size, n_layers=1, dropout=0.01, batch_size=1):
+    def __init__(self, input_size, hidden_size, n_layers=2, dropout=0.01, batch_size=1):
         super(EncoderRNN, self).__init__()
         self.hidden_size = hidden_size
         self.batch_size = batch_size
@@ -264,7 +264,7 @@ class Attn(nn.Module):
         return energy
 
 class BahdanauAttnDecoderRNN(nn.Module):
-    def __init__(self, hidden_size, output_size, n_layers=1, dropout_p=0.1):
+    def __init__(self, hidden_size, output_size, n_layers=2, dropout_p=0.1):
         super(BahdanauAttnDecoderRNN, self).__init__()
         self.hidden_size = hidden_size
         self.output_size = output_size
@@ -303,7 +303,7 @@ class BahdanauAttnDecoderRNN(nn.Module):
         return output, hidden, attn_weights
 
 class LuongAttnDecoderRNN(nn.Module):
-    def __init__(self, attn_model, hidden_size, output_size, n_layers=1, dropout=0.1):
+    def __init__(self, attn_model, hidden_size, output_size, n_layers=2, dropout=0.1):
         super(LuongAttnDecoderRNN, self).__init__()
         self.attn_model = attn_model
         self.hidden_size = hidden_size
@@ -591,6 +591,12 @@ def trainIters(encoder, decoder, n_iters, out_e, out_d, print_every=1000, learni
             plot_losses.append(plot_loss_avg)
             plot_loss_total = 0
 
+    save_pickle((output_lang, pairs), args.output_c)
+    encoder.eval()
+    torch.save(encoder, out_e)
+    decoder.eval()
+    torch.save(decoder, out_d)
+
 
 def evaluate(encoder, decoder, sentence, max_length=MAX_LENGTH):
     with torch.no_grad():
@@ -647,6 +653,8 @@ if __name__ == '__main__':
                         help='model bin (default: encoder.bin)')
     parser.add_argument('--input-d', type=str, default="decoder.bin", metavar='F',
                         help='model bin (default: decoder.bin)')
+    parser.add_argument('--action', type=str, default="train", metavar='F',
+                        help='training corpus file')
     parser.add_argument('corpus', type=str, metavar='F',
                         help='training corpus file')
     parser.add_argument('--seq-length', type=int, default=50, metavar='N',
@@ -681,29 +689,34 @@ if __name__ == '__main__':
     print("####################################################")
     print()
 
-    if os.path.exists(args.input_c) and os.path.exists(args.input_e) and os.path.exists(args.input_d):
-        comfirm = input("Train with existing model and corpus? [Y/n]")
-        if comfirm == "y" or comfirm == "Y":
-            output_lang, pairs = load_pickle(args.input_c)
-            encoder = torch.load(args.input_e)
-            attn_decoder = torch.load(args.input_d)
+    if args.action == 'train':
+        if os.path.exists(args.input_c) and os.path.exists(args.input_e) and os.path.exists(args.input_d):
+            comfirm = input("Train with existing model and corpus? [Y/n]")
+            if comfirm == "y" or comfirm == "Y":
+                output_lang, pairs = load_pickle(args.input_c)
+                encoder = torch.load(args.input_e)
+                attn_decoder = torch.load(args.input_d)
+            else:
+                print("Re-train the model ...")
+                output_lang, pairs = prepare_data(args.corpus, args.mode)
+                encoder = EncoderRNN(output_lang.n_words, args.hidden_dim, 1, batch_size=args.batch_size).to(device)
+                attn_decoder = LuongAttnDecoderRNN('general', args.hidden_dim, output_lang.n_words, 1).to(device)
+
         else:
-            print("Re-train the model ...")
+            print("Train a new model ...")
             output_lang, pairs = prepare_data(args.corpus, args.mode)
+            print(len(output_lang.word2index))
             encoder = EncoderRNN(output_lang.n_words, args.hidden_dim, 1, batch_size=args.batch_size).to(device)
             attn_decoder = LuongAttnDecoderRNN('general', args.hidden_dim, output_lang.n_words, 1).to(device)
 
+        print(random.choice(pairs))
+        trainIters(encoder, attn_decoder, args.epochs, args.output_e, args.output_d, print_every=args.log_interval, learning_rate=args.lr, batch_size=args.batch_size)
+
     else:
-        print("Train a new model ...")
-        output_lang, pairs = prepare_data(args.corpus, args.mode)
-        print(len(output_lang.word2index))
-        encoder = EncoderRNN(output_lang.n_words, args.hidden_dim, 1, batch_size=args.batch_size).to(device)
-        attn_decoder = LuongAttnDecoderRNN('general', args.hidden_dim, output_lang.n_words, 1).to(device)
+        output_lang, pairs = load_pickle(args.input_c)
+        encoder = torch.load(args.input_e)
+        attn_decoder = torch.load(args.input_d)
+        evaluateRandomly(encoder, attn_decoder, n=5)
 
-
-
-    print(random.choice(pairs))
-    trainIters(encoder, attn_decoder, args.epochs, args.output_e, args.output_d, print_every=args.log_interval, learning_rate=args.lr, batch_size=args.batch_size)
-    evaluateRandomly(encoder, attn_decoder, n=5)
 
 
