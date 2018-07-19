@@ -25,23 +25,23 @@ MAX_LENGTH = 200
 
 class Lang:
     def __init__(self):
-        self.word2index = {'<SOS>': 0, '<EOS>': 1, '<PAD>': 2, '<UNK>': 3}
-        self.word2count = {}
-        self.index2word = {0: '<SOS>', 1: '<EOS>', 2: '<PAD>', 3: '<UNK>'}
-        self.n_words = 4 # Count default tokens
+        self.val2ind = {'<SOS>': 0, '<EOS>': 1, '<PAD>': 2, '<UNK>': 3}
+        self.val_counter = {}
+        self.ind2val = {0: '<SOS>', 1: '<EOS>', 2: '<PAD>', 3: '<UNK>'}
+        self.num_val = 4 # Count default tokens
 
     def addSentence(self, sentence):
         for word in sentence.split(' '):
             self.addWord(word)
 
     def addWord(self, word):
-        if word not in self.word2index:
-            self.word2index[word] = self.n_words
-            self.word2count[word] = 1
-            self.index2word[self.n_words] = word
-            self.n_words += 1
+        if word not in self.val2ind:
+            self.val2ind[word] = self.num_val
+            self.val_counter[word] = 1
+            self.ind2val[self.num_val] = word
+            self.num_val += 1
         else:
-            self.word2count[word] += 1
+            self.val_counter[word] += 1
 
 
 def read_langs(path, mode):
@@ -71,7 +71,7 @@ def read_langs(path, mode):
         print("Invalid file path. Exiting..." )
         os._exit(1)
 
-    # for i in cut_sentence_new(raw_text):    print(i)
+    # for i in cut_sentence(raw_text):    print(i)
     if mode == 'char':
         word_list = list(raw_text)
     elif mode == 'word':
@@ -82,23 +82,46 @@ def read_langs(path, mode):
 
     # Map char to int / int to char
     for word in word_list:
-        if word not in lang.word2index:
-            lang.word2index[word] = lang.n_words
-            lang.word2count[word] = 1
-            lang.index2word[lang.n_words] = word
-            lang.n_words += 1
+        if word not in lang.val2ind:
+            lang.val2ind[word] = lang.num_val
+            lang.val_counter[word] = 1
+            lang.ind2val[lang.num_val] = word
+            lang.num_val += 1
         else:
-            lang.word2count[word] += 1
-    # print(self.word2count)
+            lang.val_counter[word] += 1
+    # print(self.val_counter)
     # Prepare training data, every <seq_length> sequence, predict 1 char after it
     pairs = []
-    sentences = cut_sentence_new(raw_text)
+    sentences = cut_sentence(raw_text)
     for ind in range(len(sentences)-1):
         pairs.append([sentences[ind], sentences[ind+1]])
     return lang, pairs
 
 
-def cut_sentence_new(words):
+def cut_sentence(words):
+    # words = (words).decode('utf8')
+    start = 0
+    i = 0
+    sents = []
+    closure_flag = False
+    punt_list = '.!?:;~。！？：；～』”」'
+    closure_list = "「“『』”」"
+    for word in words:
+        if word in closure_list:    closure_flag = not (closure_flag)
+        if word in punt_list and token not in punt_list and not (closure_flag):
+            # check if next word is punctuation or not
+            sents.append(words[start:i + 1])
+            start = i + 1
+            i += 1
+        else:
+            i += 1
+            token = list(words[start:i + 2]).pop()
+            # get next word
+    if start < len(words):
+        sents.append(words[start:])
+    return sents
+
+def cut_sentence(words):
     # words = (words).decode('utf8')
     start = 0
     i = 0
@@ -122,9 +145,10 @@ def cut_sentence_new(words):
     return sents
 
 
+
 def prepare_data(path, mode='word'):
     output_lang, pairs = read_langs(path, mode)
-    print("Read {} sentence pairs, total {} words.".format(len(pairs), output_lang.n_words))
+    print("Read {} sentence pairs, total {} words.".format(len(pairs), output_lang.num_val))
 
     # pairs = self.filter_pairs(pairs)
     # print("Filtered to %d pairs" % len(pairs))
@@ -134,7 +158,7 @@ def prepare_data(path, mode='word'):
 
 
 class EncoderRNN(nn.Module):
-    def __init__(self, input_size, hidden_size, n_layers=2, dropout=0.01, batch_size=1):
+    def __init__(self, input_size, hidden_size, n_layers=1, dropout=0.01, batch_size=1):
         super(EncoderRNN, self).__init__()
         self.hidden_size = hidden_size
         self.batch_size = batch_size
@@ -234,9 +258,7 @@ class Attn(nn.Module):
         this_batch_size = encoder_outputs.size(1)
 
         # Create variable to store attention energies
-        attn_energies = Variable(torch.zeros(this_batch_size, max_len))  # B x S
-
-        if USE_CUDA:  attn_energies = attn_energies.cuda()
+        attn_energies = Variable(torch.zeros(this_batch_size, max_len)).to(device)  # B x S
 
         # For each batch of encoder outputs
         for b in range(this_batch_size):
@@ -264,7 +286,7 @@ class Attn(nn.Module):
         return energy
 
 class BahdanauAttnDecoderRNN(nn.Module):
-    def __init__(self, hidden_size, output_size, n_layers=2, dropout_p=0.1):
+    def __init__(self, hidden_size, output_size, n_layers=1, dropout_p=0.1):
         super(BahdanauAttnDecoderRNN, self).__init__()
         self.hidden_size = hidden_size
         self.output_size = output_size
@@ -303,7 +325,7 @@ class BahdanauAttnDecoderRNN(nn.Module):
         return output, hidden, attn_weights
 
 class LuongAttnDecoderRNN(nn.Module):
-    def __init__(self, attn_model, hidden_size, output_size, n_layers=2, dropout=0.1):
+    def __init__(self, attn_model, hidden_size, output_size, n_layers=1, dropout=0.1):
         super(LuongAttnDecoderRNN, self).__init__()
         self.attn_model = attn_model
         self.hidden_size = hidden_size
@@ -320,7 +342,7 @@ class LuongAttnDecoderRNN(nn.Module):
         if attn_model != 'none':  # Choose attention model
             self.attn = Attn(attn_model, hidden_size)
 
-    def forward(self, input_seq, last_hidden, encoder_outputs):
+    def forward(self, input_seq, last_context, last_hidden, encoder_outputs):
         # Note: we run this one step at a time
         #         print("decoder forwarding~~~")
         #         print(input_seq.shape, last_hidden.shape, encoder_outputs.shape)
@@ -331,7 +353,8 @@ class LuongAttnDecoderRNN(nn.Module):
         embedded = self.embedding_dropout(embedded)
         #         print(batch_size, embedded.shape)
         embedded = embedded.view(1, batch_size, self.hidden_size)  # S=1 x B x N
-        #         print(batch_size, embedded.shape)
+        # print(last_context.shape, last_context.unsqueeze(0).shape, embedded.shape)
+        # embedded = torch.cat((embedded, last_context.unsqueeze(0)), 2)
         # Get current hidden state from input word and last hidden state
         rnn_output, hidden = self.gru(embedded, last_hidden)
 
@@ -351,17 +374,17 @@ class LuongAttnDecoderRNN(nn.Module):
         output = self.out(concat_output)
 
         # Return final output, hidden state, and attention weights (for visualization)
-        return output, hidden, attn_weights
+        return output, context, hidden, attn_weights
 
 
 # Return a list of indexes, one for each word in the sentence, plus EOS
 def indexes_from_sentence(lang, sentence, mode='word'):
     if mode == 'char':
-        temp = [lang.word2index[word] for word in sentence]
+        temp = [lang.val2ind[letter] for letter in sentence]
         temp.append(EOS_token)
         return temp
     elif mode == 'word':
-        temp = [lang.word2index[word] for word in jieba.cut(sentence, cut_all=False)]
+        temp = [lang.val2ind[word] for word in jieba.cut(sentence, cut_all=False)]
         temp.append(EOS_token)
         return temp
     else:
@@ -426,8 +449,6 @@ def sequence_mask(sequence_length, max_len=None):
     seq_range = torch.range(0, max_len - 1).long()
     seq_range_expand = seq_range.unsqueeze(0).expand(batch_size, max_len)
     seq_range_expand = Variable(seq_range_expand).to(device)
-    # if USE_CUDA:
-    #     seq_range_expand = seq_range_expand.cuda()
     seq_length_expand = (sequence_length.unsqueeze(1).expand_as(seq_range_expand))
     return seq_range_expand < seq_length_expand
 
@@ -471,11 +492,12 @@ def train(input_batches, input_lengths, target_batches, target_lengths, encoder,
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
     loss = 0
-
     batch_size = len(input_lengths)
+
     encoder_outputs, encoder_hidden = encoder(input_batches, input_lengths, encoder_hidden)
     decoder_input = Variable(torch.LongTensor([SOS_token] * batch_size)).to(device)
     decoder_hidden = encoder_hidden[:decoder.n_layers] # Use last (forward) hidden state from encoder
+    decoder_context = Variable(torch.zeros(1, decoder.hidden_size)).to(device)
 #     print(encoder_hidden.shape, decoder_hidden.shape)
     max_target_length = max(target_lengths)
     all_decoder_outputs = Variable(torch.zeros(max_target_length, batch_size, decoder.output_size)).to(device)
@@ -486,40 +508,37 @@ def train(input_batches, input_lengths, target_batches, target_lengths, encoder,
     if use_teacher_forcing:
         # Teacher forcing: Feed the target as the next input
         for t in range(max(target_lengths)):
-            decoder_output, decoder_hidden, decoder_attn = decoder(
-                decoder_input, decoder_hidden, encoder_outputs
-            )
+            decoder_output, decoder_context, decoder_hidden, decoder_attn \
+                = decoder(decoder_input, decoder_context, decoder_hidden, encoder_outputs)
 
             all_decoder_outputs[t] = decoder_output
             decoder_input = target_batches[t] # Next input is current target
 
-        # Loss calculation and backpropagation
-        loss = masked_cross_entropy(
+        # loss += self.criterion(decoder_output, target_variable[di])
+        loss = masked_cross_entropy(    # calculate loss for whole seq. at once
             all_decoder_outputs.transpose(0, 1).contiguous(), # -> batch x seq
             target_batches.transpose(0, 1).contiguous(), # -> batch x seq
-            target_lengths
-        )
-
+            target_lengths)
     else:
         # Without teacher forcing: use its own predictions as the next input
         for t in range(max(target_lengths)):
 #             print(decoder_hidden.shape)
-            decoder_output, decoder_hidden, decoder_attn = decoder(
-                decoder_input, decoder_hidden, encoder_outputs
-            )
+            decoder_output, decoder_context, decoder_hidden, decoder_attn \
+                = decoder(decoder_input, decoder_context, decoder_hidden, encoder_outputs)
 
             all_decoder_outputs[t] = decoder_output
             topv, topi = decoder_output.topk(1)
-            decoder_input = topi.squeeze().detach()  # detach from history as input
+            decoder_input = topi.squeeze().detach().to(device)  # detach from history as input
+            if decoder_input.item() == EOS_token:   break
 
-        # Loss calculation and backpropagation
         loss = masked_cross_entropy(
             all_decoder_outputs.transpose(0, 1).contiguous(), # -> batch x seq
             target_batches.transpose(0, 1).contiguous(), # -> batch x seq
-            target_lengths
-        )
+            target_lengths)
 
-    loss.backward()
+    loss.backward()     # backpropagation
+    torch.nn.utils.clip_grad_norm_(encoder.parameters(), 1e-0/2)
+    torch.nn.utils.clip_grad_norm_(decoder.parameters(), 1e-0/2)
     encoder_optimizer.step()
     decoder_optimizer.step()
 
@@ -598,49 +617,116 @@ def trainIters(encoder, decoder, n_iters, out_e, out_d, print_every=1000, learni
     torch.save(decoder, out_d)
 
 
-def evaluate(encoder, decoder, sentence, max_length=MAX_LENGTH):
+def beamSearchInfer(sample, top_k, decoder):
+    alpha = 0.5
+    # for current sample, search k possible situations
+    samples = []
+    decoder_input = Variable(torch.LongTensor([[sample[0][-1]]])).to(device)
+    sequence, pre_scores, fin_scores, avg_scores, decoder_context, decoder_hidden, decoder_attention, encoder_outputs = sample
+    decoder_output, decoder_context, decoder_hidden, decoder_attention \
+        = decoder(decoder_input, decoder_context, decoder_hidden, encoder_outputs)
+
+    # choose topk
+    topk = decoder_output.data.topk(top_k)
+    for k in range(top_k):
+        topk_prob = topk[0][0][k]
+        topk_index = int(topk[1][0][k])
+        pre_scores += topk_prob
+        fin_scores = pre_scores - (k - 1 ) * alpha
+        samples.append([sequence+[topk_index], pre_scores, fin_scores, avg_scores, decoder_context, decoder_hidden, decoder_attention, encoder_outputs])
+    return samples
+
+
+import pandas as pd
+
+def evaluate(encoder, decoder, sentence, temperature=0.1, max_length=MAX_LENGTH, use_beam_search=False):
     with torch.no_grad():
         input_tensor = tensorFromSentence(output_lang, sentence)
         input_length = input_tensor.size()[0]
 
-        encoder_hidden = torch.zeros(2, 1, encoder.hidden_size, device=device)#encoder.initHidden()
+        encoder_hidden = torch.zeros(2, 1, encoder.hidden_size, device=device)#encoder.initHidden(), 2 for bi-direction
         encoder_outputs, encoder_hidden = encoder(input_tensor, [input_length], encoder_hidden)
 
         decoder_input = torch.tensor([[SOS_token]], device=device)  # SOS
         decoder_hidden = encoder_hidden[:decoder.n_layers]
+        decoder_context = Variable(torch.zeros(1, decoder.hidden_size)).to(device)
 
         decoded_words = []
         decoder_attentions = torch.zeros(max_length, max_length)
 
-        for di in range(max_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(decoder_input, decoder_hidden, encoder_outputs)
-            decoder_attentions[di,:decoder_attention.size(2)] += decoder_attention.squeeze(0).squeeze(0).cpu().data
-            # topv, topi = decoder_output.data.topk(1)
+        if use_beam_search:
+            top_k = 2
+            decoder_output, decoder_context, decoder_hidden, decoder_attn \
+                = decoder(decoder_input, decoder_context, decoder_hidden, encoder_outputs)
+            topk = decoder_output.data.topk(top_k)
+            samples = [[]] * top_k
+            dead_k = 0
+            final_samples = []
+            for index in range(top_k): # init topK samples for first round
+                topk_prob = topk[0][0][index]
+                topk_index = int(topk[1][0][index])
+                samples[index] = [[topk_index], topk_prob, 0, 0, decoder_context, decoder_hidden, decoder_attn, encoder_outputs]
 
-            pred = decoder_output.data.view(-1).div(0.8).exp()
-            topi = torch.multinomial(pred, 1)[0]
+            for _ in range(max_length):
+                tmp = []
+                for index in range(len(samples)):
+                    tmp.extend(beamSearchInfer(samples[index], top_k, decoder))
+                # samples = []
 
-            if topi.item() == EOS_token:
-                decoded_words.append('<EOS>')
-                break
-            else:
-                decoded_words.append(output_lang.index2word[topi.item()])
+                # select topk
+                df = pd.DataFrame(tmp)
+                df.columns = ['sequence', 'pre_socres', 'fin_scores', "avg_scores", "decoder_context", "decoder_hidden", "decoder_attention", "encoder_outputs"]
+                sequence_len = df.sequence.apply(lambda x:len(x))
+                df['avg_scores'] = df['fin_scores'] / sequence_len  # instead of greedy search, choose the one with highest AVG_SCORE
+                df = df.sort_values('avg_scores', ascending=False).reset_index().drop(['index'], axis=1)
+                df = df[:(top_k - dead_k)]
+                for index in range(len(df)):
+                    group = df.ix[index]    # deprecated, replace it with loc/iloc
+                    if group.tolist()[0][-1] == EOS_token:
+                        final_samples.append(group.tolist())
+                        df = df.drop([index], axis=0)
+                        dead_k += 1
+                        print("drop {}, {}".format(group.tolist()[0], dead_k))
+                samples = df.values.tolist()
+                if len(samples) == 0:   break
 
-            decoder_input = Variable(torch.LongTensor([topi])).to(device)#topi.squeeze().detach()
+            if len(final_samples) < top_k:  # unable to get enough samples that predict EOS
+                final_samples.extend(samples[:(top_k - dead_k)])
 
-        return decoded_words, decoder_attentions[:di + 1]
+            final_samples = sorted(final_samples,key=lambda x:(x[3]), reverse=True)
+
+            return [output_lang.ind2val[ind] for ind in final_samples[0][0]], final_samples[0][3]
 
 
-def evaluateRandomly(encoder, decoder, n=10):
+        else:
+            for di in range(max_length):
+                decoder_output, decoder_context, decoder_hidden, decoder_attn \
+                    = decoder(decoder_input, decoder_context, decoder_hidden, encoder_outputs)
+                decoder_attentions[di,:decoder_attn.size(2)] += decoder_attn.squeeze(0).squeeze(0).cpu().data
+                # topv, topi = decoder_output.data.topk(1)  #return k largest element, along with index
+
+                pred = decoder_output.data.view(-1).div(temperature).exp()
+                topi = torch.multinomial(pred, 1)[0]
+                decoder_input = Variable(torch.LongTensor([topi])).to(device)#topi.squeeze().detach()
+
+                if topi.item() == EOS_token:
+                    decoded_words.append('<EOS>')
+                    break
+                else:
+                    decoded_words.append(output_lang.ind2val[topi.item()])
+
+            return decoded_words, decoder_attentions[:di + 1]
+
+
+def evaluateRandomly(encoder, decoder, n=10, use_beam_search=False):
     for i in range(n):
         pair = random.choice(pairs)
         print('>', pair[0])
         print('=', pair[1])
-        output_words, attentions = evaluate(encoder, decoder, pair[0])
+        output_words, attentions = evaluate(encoder, decoder, pair[0], use_beam_search=use_beam_search)
         output_sentence = ' '.join(output_words)
         print('<', output_sentence)
         print('')
-
 
 
 import argparse
@@ -654,7 +740,9 @@ if __name__ == '__main__':
     parser.add_argument('--input-d', type=str, default="decoder.bin", metavar='F',
                         help='model bin (default: decoder.bin)')
     parser.add_argument('--action', type=str, default="train", metavar='F',
-                        help='training corpus file')
+                        help='train / predict')
+    parser.add_argument('--beam-search', dest='use_beam_search', action='store_true',
+                        help='use beam search straregy for prediction')
     parser.add_argument('corpus', type=str, metavar='F',
                         help='training corpus file')
     parser.add_argument('--seq-length', type=int, default=50, metavar='N',
@@ -679,6 +767,7 @@ if __name__ == '__main__':
                         help='output model file')
     parser.add_argument('--output-c', type=str, default='corpus.bin', metavar='F',
                         help='output corpus related file (mappings & vocab)')
+    parser.set_defaults(use_beam_search=False)
     args = parser.parse_args()
 
     # Load mappings & vocabularies
@@ -699,15 +788,15 @@ if __name__ == '__main__':
             else:
                 print("Re-train the model ...")
                 output_lang, pairs = prepare_data(args.corpus, args.mode)
-                encoder = EncoderRNN(output_lang.n_words, args.hidden_dim, 1, batch_size=args.batch_size).to(device)
-                attn_decoder = LuongAttnDecoderRNN('general', args.hidden_dim, output_lang.n_words, 1).to(device)
+                encoder = EncoderRNN(output_lang.num_val, args.hidden_dim, 1, batch_size=args.batch_size).to(device)
+                attn_decoder = LuongAttnDecoderRNN('general', args.hidden_dim, output_lang.num_val, 1).to(device)
 
         else:
             print("Train a new model ...")
             output_lang, pairs = prepare_data(args.corpus, args.mode)
-            print(len(output_lang.word2index))
-            encoder = EncoderRNN(output_lang.n_words, args.hidden_dim, 1, batch_size=args.batch_size).to(device)
-            attn_decoder = LuongAttnDecoderRNN('general', args.hidden_dim, output_lang.n_words, 1).to(device)
+            print(len(output_lang.val2ind))
+            encoder = EncoderRNN(output_lang.num_val, args.hidden_dim, 1, batch_size=args.batch_size).to(device)
+            attn_decoder = LuongAttnDecoderRNN('general', args.hidden_dim, output_lang.num_val, 1).to(device)
 
         print(random.choice(pairs))
         trainIters(encoder, attn_decoder, args.epochs, args.output_e, args.output_d, print_every=args.log_interval, learning_rate=args.lr, batch_size=args.batch_size)
@@ -716,7 +805,7 @@ if __name__ == '__main__':
         output_lang, pairs = load_pickle(args.input_c)
         encoder = torch.load(args.input_e)
         attn_decoder = torch.load(args.input_d)
-        evaluateRandomly(encoder, attn_decoder, n=5)
+        evaluateRandomly(encoder, attn_decoder, n=5, use_beam_search=args.use_beam_search)
 
 
 
