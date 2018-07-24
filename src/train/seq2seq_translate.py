@@ -92,7 +92,7 @@ def read_langs(path, mode):
     # print(self.val_counter)
     # Prepare training data, every <seq_length> sequence, predict 1 char after it
     pairs = []
-    sentences = cut_sentence(raw_text)
+    sentences = cut_sentence_new(raw_text)
     for ind in range(len(sentences)-1):
         pairs.append([sentences[ind], sentences[ind+1]])
     return lang, pairs
@@ -121,25 +121,20 @@ def cut_sentence(words):
         sents.append(words[start:])
     return sents
 
-def cut_sentence(words):
-    # words = (words).decode('utf8')
+def cut_sentence_new(words):
     start = 0
     i = 0
     sents = []
-    closure_flag = False
-    punt_list = '.!?:;~。！？：；～』”」'
-    closure_list = "「“『』”」"
+
+    punt_list = ',.!?:;~，。！？：；～'
+    # closure_list = "「“『』”」"
     for word in words:
-        if word in closure_list:    closure_flag = not (closure_flag)
-        if word in punt_list and token not in punt_list and not (closure_flag):
+        if word in punt_list:
             # check if next word is punctuation or not
             sents.append(words[start:i + 1])
             start = i + 1
-            i += 1
-        else:
-            i += 1
-            token = list(words[start:i + 2]).pop()
-            # get next word
+
+        i += 1
     if start < len(words):
         sents.append(words[start:])
     return sents
